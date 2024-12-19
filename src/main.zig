@@ -1,5 +1,5 @@
 const std = @import("std");
-const parser = @import("parser.zig");
+const parser = @import("parser/elf.zig");
 
 const print = std.debug.print;
 
@@ -31,6 +31,7 @@ pub fn main() !void {
     for (args.items) |arg| {
         const file = try std.fs.cwd().openFile(arg, .{});
         defer file.close();
-        _ = try parser.Elf64.new(allocator, file);
+        const header = try parser.Elf64.new(allocator, file);
+        print("Header: {any}\n", .{header});
     }
 }
