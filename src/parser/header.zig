@@ -4,7 +4,7 @@ const magic_bytes = [4]u8{ 0x7F, 0x45, 0x4C, 0x46 };
 
 pub const ElfHeader = struct {
     class: u8,
-    data: u8,
+    data: std.builtin.Endian,
     version: u8,
     osabi: u8,
     abiversion: u8,
@@ -35,7 +35,7 @@ pub const ElfHeader = struct {
 
         return ElfHeader{
             .class = magic[4],
-            .data = magic[5],
+            .data = endian,
             .version = magic[6],
             .osabi = magic[7],
             .abiversion = magic[8],
