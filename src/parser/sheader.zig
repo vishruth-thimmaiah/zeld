@@ -13,7 +13,7 @@ pub const SectionHeader = struct {
     addralign: u64,
     entsize: u64,
 
-    pub fn new(allocator: std.mem.Allocator, bytes: []const u8, fheader: ElfHeader) !std.ArrayList(SectionHeader) {
+    pub fn new(allocator: std.mem.Allocator, bytes: []const u8, fheader: ElfHeader) ![]SectionHeader {
         var offset: usize = fheader.shoff;
         const endian = fheader.data;
 
@@ -37,7 +37,6 @@ pub const SectionHeader = struct {
             try headers.append(header);
             offset += fheader.shentsize;
         }
-
-        return headers;
+        return headers.toOwnedSlice();
     }
 };

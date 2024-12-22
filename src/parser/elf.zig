@@ -1,10 +1,12 @@
 const std = @import("std");
 const ElfHeader = @import("header.zig").ElfHeader;
-const SectionHeader = @import("sheader.zig").SectionHeader;
+const ElfSectionHeader = @import("sheader.zig").SectionHeader;
+const ElfSection = @import("sections.zig").ElfSection;
 
 pub const Elf64 = struct {
     header: ElfHeader,
-    sheaders: std.ArrayList(SectionHeader),
+    sheaders: []ElfSectionHeader,
+    sdata: []ElfSection,
 
     pub fn new(allocator: std.mem.Allocator, file: std.fs.File) !Elf64 {
         const stat = try file.stat();
@@ -12,11 +14,15 @@ pub const Elf64 = struct {
         defer allocator.free(filebuffer);
 
         const fileHeader = try ElfHeader.new(allocator, filebuffer);
-        const sheaders = try SectionHeader.new(allocator, filebuffer, fileHeader);
+        const sheaders = try ElfSectionHeader.new(allocator, filebuffer, fileHeader);
+        defer allocator.free(sheaders);
+        const section = try ElfSection.new(allocator, filebuffer, fileHeader, sheaders);
+        defer allocator.free(section);
 
         return Elf64{
             .header = fileHeader,
             .sheaders = sheaders,
+            .sdata = section,
         };
     }
 };
