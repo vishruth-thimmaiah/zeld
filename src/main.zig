@@ -32,6 +32,6 @@ pub fn main() !void {
         const file = try std.fs.cwd().openFile(arg, .{});
         defer file.close();
         const elfObj = try parser.Elf64.new(allocator, file);
-        print("Header: {any}\n", .{elfObj.header});
+        _ = elfObj;
     }
 }

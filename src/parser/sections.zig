@@ -37,7 +37,6 @@ pub const ElfSection = struct {
                 .data = bytes[sheader.offset .. sheader.offset + sheader.size],
             };
             try sections.append(section);
-            print("Section: {any}\n", .{section});
         }
         return sections.toOwnedSlice();
     }
@@ -46,6 +45,7 @@ pub const ElfSection = struct {
         var offset = string_header.offset + idx;
 
         var section_name = std.ArrayList(u8).init(allocator);
+        defer section_name.deinit();
 
         while (true) {
             if (bytes[offset] == 0) {
@@ -55,5 +55,19 @@ pub const ElfSection = struct {
             offset += 1;
         }
         return section_name.toOwnedSlice();
+    }
+
+    fn getSymbolName(idx: u32, bytes: []const u8, string_header: ElfSectionHeader) ![]const u8 {
+        const start_offset = string_header.offset + idx;
+        var end_offset = start_offset;
+
+        while (true) {
+            if (bytes[end_offset] == 0) {
+                break;
+            }
+            end_offset += 1;
+        }
+
+        return bytes[start_offset..end_offset];
     }
 };

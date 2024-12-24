@@ -33,7 +33,6 @@ pub const SectionHeader = struct {
                 .addralign = std.mem.readInt(u64, bytes[offset + 48 .. offset + 56][0..8], endian),
                 .entsize = std.mem.readInt(u64, bytes[offset + 56 .. offset + 64][0..8], endian),
             };
-            std.debug.print("Section Header: {any}\n", .{header});
             try headers.append(header);
             offset += fheader.shentsize;
         }
