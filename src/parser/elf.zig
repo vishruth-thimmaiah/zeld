@@ -18,15 +18,15 @@ pub const Elf64 = struct {
         const fileHeader = try ElfHeader.new(allocator, filebuffer);
         const sheaders = try ElfSectionHeader.new(allocator, filebuffer, fileHeader);
         defer allocator.free(sheaders);
-        const section = try ElfSection.new(allocator, filebuffer, fileHeader, sheaders);
-        defer allocator.free(section);
-        const symbols = try ElfSymbol.new(allocator, fileHeader, sheaders, section, filebuffer);
+        const sections = try ElfSection.new(allocator, filebuffer, fileHeader, sheaders);
+        defer allocator.free(sections);
+        const symbols = try ElfSymbol.new(allocator, fileHeader, sheaders, sections, filebuffer);
         defer allocator.free(symbols);
 
         return Elf64{
             .header = fileHeader,
             .sheaders = sheaders,
-            .sections = section,
+            .sections = sections,
             .symbols = symbols,
         };
     }

@@ -3,6 +3,7 @@ const print = std.debug.print;
 
 const ElfHeader = @import("header.zig").ElfHeader;
 const ElfSectionHeader = @import("sheader.zig").SectionHeader;
+const ElfRelocations = @import("relocations.zig").ElfRelocations;
 
 pub const ElfSection = struct {
     name: []const u8,
@@ -13,7 +14,7 @@ pub const ElfSection = struct {
     info: u32,
     addralign: u64,
     data: []const u8,
-    // relocations: ,
+    relocations: []ElfRelocations,
 
     pub fn new(allocator: std.mem.Allocator, bytes: []const u8, header: ElfHeader, sheaders: []ElfSectionHeader) ![]ElfSection {
         const string_section = sheaders[header.shstrndx];
@@ -26,7 +27,7 @@ pub const ElfSection = struct {
             }
             const name = try getSectionName(allocator, sheader.name, bytes, string_section);
             defer allocator.free(name);
-            const section = ElfSection{
+            var section = ElfSection{
                 .name = name,
                 .type = sheader.type,
                 .flags = sheader.flags,
@@ -35,7 +36,11 @@ pub const ElfSection = struct {
                 .info = sheader.info,
                 .addralign = sheader.addralign,
                 .data = bytes[sheader.offset .. sheader.offset + sheader.size],
+                .relocations = undefined
             };
+            section.relocations = try ElfRelocations.new(allocator, header, section);
+            defer allocator.free(section.relocations);
+            std.debug.print("Symbol: {any}\n\n", .{section});
             try sections.append(section);
         }
         return sections.toOwnedSlice();
