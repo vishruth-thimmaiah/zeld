@@ -12,29 +12,20 @@ pub const ElfSymbol = struct {
     value: u64,
     size: u64,
 
-    pub fn new(allocator: std.mem.Allocator, header: ElfHeader, sheaders: []ElfSectionHeader, sections: []ElfSection, bytes: []const u8) ![]ElfSymbol {
+    pub fn new(allocator: std.mem.Allocator, header: ElfHeader, sheaders: []ElfSectionHeader, sections: []ElfSection, symtab_index: usize) ![]ElfSymbol {
         var symbols = try std.ArrayList(ElfSymbol).initCapacity(allocator, sheaders.len);
         defer symbols.deinit();
-
-        var symtab_index: usize = undefined;
-
-        for (sheaders, 0..) |sheader, i| {
-            if (sheader.type == 2) {
-                symtab_index = i;
-                break;
-            }
-        }
 
         const symtab_header = sheaders[symtab_index];
         const symtab = sections[symtab_index - 1]; // Account for the null section
 
-        const string_section = sheaders[symtab.link];
+        const string_section = sections[symtab.link - 1];
 
         for (0..symtab_header.size / symtab_header.entsize) |i| {
             const offset = symtab_header.entsize * i;
             const name_offset = std.mem.readInt(u32, symtab.data[offset .. offset + 4][0..4], header.data);
             const symbol = ElfSymbol{
-                .name = try getSymbolName(name_offset, bytes, string_section),
+                .name = try getSymbolName(name_offset, string_section.data),
                 .info = std.mem.readInt(u8, symtab.data[offset + 4 .. offset + 5][0..1], header.data),
                 .other = std.mem.readInt(u8, symtab.data[offset + 5 .. offset + 6][0..1], header.data),
                 .shndx = std.mem.readInt(u16, symtab.data[offset + 6 .. offset + 8][0..2], header.data),
@@ -42,7 +33,7 @@ pub const ElfSymbol = struct {
                 .size = std.mem.readInt(u64, symtab.data[offset + 16 .. offset + 24][0..8], header.data),
             };
 
-            std.debug.print("Symbol: {any}, {s}\n", .{symbol, symbol.name});
+            std.debug.print("Symbol: {any}, {s}\n", .{ symbol, symbol.name });
 
             try symbols.append(symbol);
         }
@@ -50,9 +41,8 @@ pub const ElfSymbol = struct {
         return symbols.toOwnedSlice();
     }
 
-    fn getSymbolName(idx: u32, bytes: []const u8, string_header: ElfSectionHeader) ![]const u8 {
-        const start_offset = string_header.offset + idx;
-        var end_offset = start_offset;
+    fn getSymbolName(idx: u32, bytes: []const u8) ![]const u8 {
+        var end_offset = idx;
 
         while (true) {
             if (bytes[end_offset] == 0) {
@@ -61,6 +51,6 @@ pub const ElfSymbol = struct {
             end_offset += 1;
         }
 
-        return bytes[start_offset..end_offset];
+        return bytes[idx..end_offset];
     }
 };

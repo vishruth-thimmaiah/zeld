@@ -20,7 +20,17 @@ pub const Elf64 = struct {
         defer allocator.free(sheaders);
         const sections = try ElfSection.new(allocator, filebuffer, fileHeader, sheaders);
         defer allocator.free(sections);
-        const symbols = try ElfSymbol.new(allocator, fileHeader, sheaders, sections, filebuffer);
+
+        var symtab_index: usize = undefined;
+
+        for (sheaders, 0..) |sheader, i| {
+            switch (sheader.type) {
+                2 => symtab_index = i,
+                else => {},
+            }
+        }
+
+        const symbols = try ElfSymbol.new(allocator, fileHeader, sheaders, sections, symtab_index);
         defer allocator.free(symbols);
 
         return Elf64{
