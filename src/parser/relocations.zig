@@ -9,21 +9,28 @@ pub const ElfRelocations = struct {
     addend: u64,
 
     pub fn new(allocator: std.mem.Allocator, header: ElfHeader, section: ElfSection) ![]ElfRelocations {
-
-        if (section.type != 4) {
-            return undefined;
-        }
-
         var relocations = try std.ArrayList(ElfRelocations).initCapacity(allocator, section.data.len / 24);
+        defer relocations.deinit();
 
-        for (0.. section.data.len / 24) |i| {
+        for (0..section.data.len / 24) |i| {
             const offset = i * 24;
-            try relocations.append(ElfRelocations{
+            const rela = ElfRelocations{
                 .offset = std.mem.readInt(u64, section.data[offset .. offset + 8][0..8], header.data),
                 .info = std.mem.readInt(u64, section.data[offset + 8 .. offset + 16][0..8], header.data),
                 .addend = std.mem.readInt(u64, section.data[offset + 16 .. offset + 24][0..8], header.data),
-            });
+            };
+            try relocations.append(rela);
         }
-        return relocations.toOwnedSlice();
+        const a = try relocations.toOwnedSlice();
+        defer allocator.free(a);
+        return try allocator.dupe(ElfRelocations, a);
+    }
+
+    pub fn get(allocator: std.mem.Allocator, header: ElfHeader, sections: []ElfSection, rela_index: usize) !void {
+        const rela_section = sections[rela_index - 1];
+        var section = &sections[rela_section.info - 1];
+
+        const relas = try ElfRelocations.new(allocator, header, rela_section);
+        section.relocations = relas;
     }
 };

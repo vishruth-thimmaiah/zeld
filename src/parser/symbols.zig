@@ -33,8 +33,6 @@ pub const ElfSymbol = struct {
                 .size = std.mem.readInt(u64, symtab.data[offset + 16 .. offset + 24][0..8], header.data),
             };
 
-            std.debug.print("Symbol: {any}, {s}\n", .{ symbol, symbol.name });
-
             try symbols.append(symbol);
         }
 
