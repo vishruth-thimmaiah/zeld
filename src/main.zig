@@ -1,5 +1,6 @@
 const std = @import("std");
 const parser = @import("parser/elf.zig");
+const linker = @import("linking/linker.zig").ElfLinker;
 
 const print = std.debug.print;
 
@@ -42,4 +43,6 @@ pub fn main() !void {
             elfObj.deinit();
         }
     }
+    const elfLinker = linker.new(elfFiles.items);
+    try elfLinker.link();
 }
