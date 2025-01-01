@@ -28,10 +28,18 @@ pub fn main() !void {
         return;
     }
 
+    var elfFiles = std.ArrayList(parser.Elf64).init(allocator);
+    defer elfFiles.deinit();
+
     for (args.items) |arg| {
         const file = try std.fs.cwd().openFile(arg, .{});
         defer file.close();
         const elfObj = try parser.Elf64.new(allocator, file);
-        _ = elfObj;
+        try elfFiles.append(elfObj);
+    }
+    defer {
+        for (elfFiles.items) |elfObj| {
+            elfObj.deinit();
+        }
     }
 }

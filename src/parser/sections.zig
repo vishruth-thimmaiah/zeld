@@ -16,6 +16,8 @@ pub const ElfSection = struct {
     data: []const u8,
     relocations: ?[]ElfRelocations,
 
+    allocator: std.mem.Allocator,
+
     pub fn new(allocator: std.mem.Allocator, bytes: []const u8, header: ElfHeader, sheaders: []ElfSectionHeader) ![]ElfSection {
         const string_section = sheaders[header.shstrndx];
 
@@ -27,19 +29,29 @@ pub const ElfSection = struct {
             }
             const name = try getSectionName(sheader.name, bytes, string_section);
             const section = ElfSection{
-                .name = name,
+                .name = try allocator.dupe(u8, name),
                 .type = sheader.type,
                 .flags = sheader.flags,
                 .addr = sheader.addr,
                 .link = sheader.link,
                 .info = sheader.info,
                 .addralign = sheader.addralign,
-                .data = bytes[sheader.offset .. sheader.offset + sheader.size],
+                .data = try allocator.dupe(u8, bytes[sheader.offset .. sheader.offset + sheader.size]),
                 .relocations = null,
+
+                .allocator = allocator,
             };
             try sections.append(section);
         }
         return sections.toOwnedSlice();
+    }
+
+    pub fn deinit(self: *const ElfSection) void {
+        self.allocator.free(self.name);
+        self.allocator.free(self.data);
+        if (self.relocations) |relocations| {
+            self.allocator.free(relocations);
+        }
     }
 
     fn getSectionName(idx: u32, bytes: []const u8, string_header: ElfSectionHeader) ![]const u8 {
