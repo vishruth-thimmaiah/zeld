@@ -8,8 +8,9 @@ const ElfRelocations = @import("relocations.zig").ElfRelocations;
 pub const Elf64 = struct {
     header: ElfHeader,
     sheaders: []ElfSectionHeader,
-    sections: []ElfSection,
+    all_sections: []ElfSection,
     symbols: []ElfSymbol,
+    sections: []ElfSection,
 
     allocator: std.mem.Allocator,
 
@@ -20,7 +21,10 @@ pub const Elf64 = struct {
 
         const fileHeader = try ElfHeader.new(allocator, filebuffer);
         const sheaders = try ElfSectionHeader.new(allocator, filebuffer, fileHeader);
-        const sections = try ElfSection.new(allocator, filebuffer, fileHeader, sheaders);
+        const all_sections = try ElfSection.new(allocator, filebuffer, fileHeader, sheaders);
+
+        var section = std.ArrayList(ElfSection).init(allocator);
+        defer section.deinit();
 
         var symtab_index: usize = undefined;
         var rela_index: usize = undefined;
@@ -29,17 +33,21 @@ pub const Elf64 = struct {
             switch (sheader.type) {
                 2 => symtab_index = i,
                 4 => rela_index = i,
-                else => {},
+                else => {
+                    if (sheader.type == 0) continue;
+                    try section.append(all_sections[i - 1]);
+                },
             }
         }
-        const symbols = try ElfSymbol.new(allocator, fileHeader, sheaders, sections, symtab_index);
-        try ElfRelocations.get(allocator, fileHeader, sections, rela_index);
+        const symbols = try ElfSymbol.new(allocator, fileHeader, sheaders, all_sections, symtab_index);
+        try ElfRelocations.get(allocator, fileHeader, all_sections, rela_index);
 
         return Elf64{
             .header = fileHeader,
             .sheaders = sheaders,
-            .sections = sections,
+            .all_sections = all_sections,
             .symbols = symbols,
+            .sections = try section.toOwnedSlice(),
 
             .allocator = allocator,
         };
@@ -47,9 +55,10 @@ pub const Elf64 = struct {
     pub fn deinit(self: *const Elf64) void {
         self.allocator.free(self.sheaders);
         self.allocator.free(self.symbols);
-        for (self.sections) |section| {
+        for (self.all_sections) |section| {
             section.deinit();
         }
+        self.allocator.free(self.all_sections);
         self.allocator.free(self.sections);
     }
 };

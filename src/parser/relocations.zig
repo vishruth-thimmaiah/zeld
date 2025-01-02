@@ -21,9 +21,7 @@ pub const ElfRelocations = struct {
             };
             try relocations.append(rela);
         }
-        const a = try relocations.toOwnedSlice();
-        defer allocator.free(a);
-        return try allocator.dupe(ElfRelocations, a);
+        return try relocations.toOwnedSlice();
     }
 
     pub fn get(allocator: std.mem.Allocator, header: ElfHeader, sections: []ElfSection, rela_index: usize) !void {
