@@ -19,7 +19,7 @@ pub const ElfSection = struct {
     allocator: std.mem.Allocator,
 
     pub fn new(allocator: std.mem.Allocator, bytes: []const u8, header: ElfHeader, sheaders: []ElfSectionHeader) ![]ElfSection {
-        const string_section = sheaders[header.shstrndx];
+        const string_section = sheaders[header.shstrndx-1];
 
         var sections = try std.ArrayList(ElfSection).initCapacity(allocator, sheaders.len);
         defer sections.deinit();

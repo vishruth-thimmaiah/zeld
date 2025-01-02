@@ -33,7 +33,9 @@ pub const SectionHeader = struct {
                 .addralign = std.mem.readInt(u64, bytes[offset + 48 .. offset + 56][0..8], endian),
                 .entsize = std.mem.readInt(u64, bytes[offset + 56 .. offset + 64][0..8], endian),
             };
-            try headers.append(header);
+            if (header.type != 0) {
+                try headers.append(header);
+            }
             offset += fheader.shentsize;
         }
         return headers.toOwnedSlice();

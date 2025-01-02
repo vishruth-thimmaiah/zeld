@@ -17,9 +17,9 @@ pub const ElfSymbol = struct {
         defer symbols.deinit();
 
         const symtab_header = sheaders[symtab_index];
-        const symtab = sections[symtab_index - 1]; // Account for the null section
+        const symtab = sections[symtab_index];
 
-        const string_section = sections[symtab.link - 1];
+        const string_section = sections[symtab.link];
 
         for (0..symtab_header.size / symtab_header.entsize) |i| {
             const offset = symtab_header.entsize * i;

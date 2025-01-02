@@ -34,8 +34,7 @@ pub const Elf64 = struct {
                 2 => symtab_index = i,
                 4 => rela_index = i,
                 else => {
-                    if (sheader.type == 0) continue;
-                    try section.append(all_sections[i - 1]);
+                    try section.append(all_sections[i]);
                 },
             }
         }
