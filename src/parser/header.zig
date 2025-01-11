@@ -51,7 +51,7 @@ pub const ElfHeader = struct {
             .phnum = std.mem.readInt(u16, bytes[56..58], endian),
             .shentsize = std.mem.readInt(u16, bytes[58..60], endian),
             .shnum = std.mem.readInt(u16, bytes[60..62], endian),
-            .shstrndx = std.mem.readInt(u16, bytes[62..64], endian),
+            .shstrndx = std.mem.readInt(u16, bytes[62..64], endian) - 1,
         };
     }
     fn getEndianness(magic: [16]u8) std.builtin.Endian {

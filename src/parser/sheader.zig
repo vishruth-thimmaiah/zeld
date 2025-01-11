@@ -21,6 +21,10 @@ pub const SectionHeader = struct {
         defer headers.deinit();
 
         for (fheader.shnum) |_| {
+            var link = std.mem.readInt(u32, bytes[offset + 40 .. offset + 44][0..4], endian);
+            if (link != 0) {
+                link -= 1;
+            }
             const header = SectionHeader{
                 .name = std.mem.readInt(u32, bytes[offset .. offset + 4][0..4], endian),
                 .type = std.mem.readInt(u32, bytes[offset + 4 .. offset + 8][0..4], endian),
@@ -28,7 +32,7 @@ pub const SectionHeader = struct {
                 .addr = std.mem.readInt(u64, bytes[offset + 16 .. offset + 24][0..8], endian),
                 .offset = std.mem.readInt(u64, bytes[offset + 24 .. offset + 32][0..8], endian),
                 .size = std.mem.readInt(u64, bytes[offset + 32 .. offset + 40][0..8], endian),
-                .link = std.mem.readInt(u32, bytes[offset + 40 .. offset + 44][0..4], endian),
+                .link = link,
                 .info = std.mem.readInt(u32, bytes[offset + 44 .. offset + 48][0..4], endian),
                 .addralign = std.mem.readInt(u64, bytes[offset + 48 .. offset + 56][0..8], endian),
                 .entsize = std.mem.readInt(u64, bytes[offset + 56 .. offset + 64][0..8], endian),
