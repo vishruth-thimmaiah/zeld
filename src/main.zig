@@ -43,6 +43,6 @@ pub fn main() !void {
             elfObj.deinit();
         }
     }
-    const elfLinker = linker.new(elfFiles.items);
+    const elfLinker = linker.new(allocator, elfFiles.items);
     try elfLinker.link();
 }

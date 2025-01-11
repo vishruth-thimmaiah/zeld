@@ -32,6 +32,7 @@ pub const Elf64 = struct {
         for (sheaders, 0..) |sheader, i| {
             switch (sheader.type) {
                 2 => symtab_index = i,
+                3 => {},
                 4 => rela_index = i,
                 else => {
                     try section.append(all_sections[i]);
