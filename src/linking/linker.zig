@@ -49,6 +49,9 @@ pub const ElfLinker = struct {
     }
 
     pub fn deinit(self: *const ElfLinker) void {
+        for (self.out.sections) |section| {
+            self.allocator.free(section.data);
+        }
         self.allocator.free(self.out.sections);
         self.allocator.free(self.out.symbols);
         self.allocator.free(self.out.sheaders);

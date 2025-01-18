@@ -13,7 +13,8 @@ pub fn mergeSections(linker: *const ElfLinker, file: parser.Elf64) !void {
 
     for (file.sections) |section| {
         if (self_sections.get(section.name)) |index| {
-            linker.mutElf.sections.items[index].data = try mergeData(linker, linker.mutElf.sections.items[index].data, section.data);
+            const original_data = linker.mutElf.sections.items[index].data;
+            linker.mutElf.sections.items[index].data = try mergeData(linker, original_data, section.data);
         } else {
             // TODO
             unreachable;
@@ -23,6 +24,5 @@ pub fn mergeSections(linker: *const ElfLinker, file: parser.Elf64) !void {
 fn mergeData(linker: *const ElfLinker, main: []const u8, other: []const u8) ![]const u8 {
     const data = &.{ main, other };
     const concated_data = try std.mem.concat(linker.allocator, u8, data);
-    defer linker.allocator.free(concated_data);
     return concated_data;
 }
