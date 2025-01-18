@@ -5,7 +5,7 @@ const parser = @import("parser");
 
 pub const buildShstrtab = @import("shstrtab.zig").buildShstrtab;
 
-pub fn mergeSections(linker: *const ElfLinker, file: parser.Elf64) !void {
+pub fn mergeSections(linker: *ElfLinker, file: parser.Elf64) !void {
     
     var self_sections = std.StringHashMap(usize).init(linker.allocator);
     defer self_sections.deinit();
@@ -19,8 +19,7 @@ pub fn mergeSections(linker: *const ElfLinker, file: parser.Elf64) !void {
             const original_data = linker.mutElf.sections.items[index].data;
             linker.mutElf.sections.items[index].data = try mergeData(linker, original_data, section.data);
         } else {
-            // TODO
-            unreachable;
+            try linker.mutElf.sections.append(section);
         }
     }
 }
