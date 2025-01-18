@@ -48,9 +48,6 @@ pub const ElfSection = struct {
     pub fn deinit(self: *const ElfSection) void {
         self.allocator.free(self.name);
         self.allocator.free(self.data);
-        if (self.relocations) |relocations| {
-            self.allocator.free(relocations);
-        }
     }
 
     fn getSectionName(idx: u32, bytes: []const u8, string_header: ElfSectionHeader) ![]const u8 {

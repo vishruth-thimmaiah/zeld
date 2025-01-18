@@ -23,31 +23,38 @@ pub const Elf64 = struct {
         const sheaders = try ElfSectionHeader.new(allocator, filebuffer, fileHeader);
         const all_sections = try ElfSection.new(allocator, filebuffer, fileHeader, sheaders);
 
-        var section = std.ArrayList(ElfSection).init(allocator);
-        defer section.deinit();
+        var sections = std.ArrayList(ElfSection).init(allocator);
+        defer sections.deinit();
+        var special_section_count: usize = 0;
 
         var symtab_index: usize = undefined;
-        var rela_index: usize = undefined;
+        var rela_indexes = std.ArrayList([2]usize).init(allocator);
+        defer rela_indexes.deinit();
 
         for (sheaders, 0..) |sheader, i| {
-            switch (sheader.type) {
+            try switch (sheader.type) {
                 2 => symtab_index = i,
                 3 => {},
-                4 => rela_index = i,
+                4 => rela_indexes.append([2]usize{ i, special_section_count }),
                 else => {
-                    try section.append(all_sections[i]);
+                    try sections.append(all_sections[i]);
+                    continue;
                 },
-            }
+            };
+            special_section_count += 1;
         }
         const symbols = try ElfSymbol.new(allocator, fileHeader, sheaders, all_sections, symtab_index);
-        try ElfRelocations.get(allocator, fileHeader, all_sections, rela_index);
+        for (rela_indexes.items) |rela_index| {
+            const rela_section = all_sections[rela_index[0]];
+            try ElfRelocations.get(allocator, fileHeader, sections.items, rela_section, rela_section.info - rela_index[1]);
+        }
 
         return Elf64{
             .header = fileHeader,
             .sheaders = sheaders,
             .all_sections = all_sections,
             .symbols = symbols,
-            .sections = try section.toOwnedSlice(),
+            .sections = try sections.toOwnedSlice(),
 
             .allocator = allocator,
         };
@@ -57,6 +64,11 @@ pub const Elf64 = struct {
         self.allocator.free(self.symbols);
         for (self.all_sections) |section| {
             section.deinit();
+        }
+        for (self.sections) |section| {
+            if (section.relocations) |relas| {
+                self.allocator.free(relas);
+            }
         }
         self.allocator.free(self.all_sections);
         self.allocator.free(self.sections);
