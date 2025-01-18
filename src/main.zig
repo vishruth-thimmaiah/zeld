@@ -43,6 +43,11 @@ pub fn main() !void {
             elfObj.deinit();
         }
     }
-    const elfLinker = linker.new(allocator, elfFiles.items);
+    var elfLinker = linker.new(allocator, elfFiles.items);
     try elfLinker.link();
+
+    for (elfLinker.out.sections) |section| {
+        print("Section: {s}, {}\n", .{section.name, section.data.len});
+        print("Data: {any}\n\n", .{section});
+    }
 }

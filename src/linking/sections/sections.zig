@@ -13,9 +13,7 @@ pub fn mergeSections(linker: *const ElfLinker, file: parser.Elf64) !void {
 
     for (file.sections) |section| {
         if (self_sections.get(section.name)) |index| {
-            std.debug.print("O:{s} {any}\n", .{ linker.out.sections[index].name, linker.out.sections[index].data.len });
             linker.out.sections[index].data = try mergeData(linker, linker.out.sections[index].data, section.data);
-            std.debug.print("I: {any}\n", .{linker.out.sections[index].data.len});
         } else {
             // TODO
             unreachable;
