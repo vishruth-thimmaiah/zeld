@@ -7,13 +7,13 @@ pub fn mergeSections(linker: *const ElfLinker, file: parser.Elf64) !void {
     var self_sections = std.StringHashMap(usize).init(linker.allocator);
     defer self_sections.deinit();
 
-    for (linker.out.sections, 0..) |*section, i| {
+    for (linker.mutElf.sections.items, 0..) |*section, i| {
         try self_sections.put(section.name, i);
     }
 
     for (file.sections) |section| {
         if (self_sections.get(section.name)) |index| {
-            linker.out.sections[index].data = try mergeData(linker, linker.out.sections[index].data, section.data);
+            linker.mutElf.sections.items[index].data = try mergeData(linker, linker.mutElf.sections.items[index].data, section.data);
         } else {
             // TODO
             unreachable;

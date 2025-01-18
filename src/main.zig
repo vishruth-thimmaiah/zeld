@@ -43,7 +43,8 @@ pub fn main() !void {
             elfObj.deinit();
         }
     }
-    var elfLinker = linker.new(allocator, elfFiles.items);
+    var elfLinker = try linker.new(allocator, elfFiles.items);
+    defer elfLinker.deinit();
     try elfLinker.link();
 
     for (elfLinker.out.sections) |section| {
