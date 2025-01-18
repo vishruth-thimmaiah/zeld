@@ -2,6 +2,7 @@ const std = @import("std");
 const parser = @import("../parser/elf.zig");
 
 const sectionLinker = @import("sections/sections.zig");
+const buildShstrtab = @import("sections/shstrtab.zig").buildShstrtab;
 const symbolLinker = @import("symbols.zig");
 const mutElf64 = @import("mutelf.zig").MutElf64;
 
@@ -32,6 +33,7 @@ pub const ElfLinker = struct {
 
             try self.merge(file);
         }
+        try buildShstrtab(self);
         self.out = try self.mutElf.toElf64();
     }
 
@@ -43,9 +45,7 @@ pub const ElfLinker = struct {
 
     fn merge(self: *ElfLinker, file: parser.Elf64) !void {
         try sectionLinker.mergeSections(self, file);
-        std.debug.print("Symbols: {d}\n", .{self.mutElf.symbols.items.len});
         try symbolLinker.mergeSymbols(self, file);
-        std.debug.print("symbols: {any}\n", .{self.mutElf.symbols.items.len});
     }
 
     pub fn deinit(self: *const ElfLinker) void {
