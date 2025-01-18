@@ -1,6 +1,7 @@
 const std = @import("std");
+
 const ElfLinker = @import("../linker.zig").ElfLinker;
-const ElfSection = @import("../../parser/sections.zig").ElfSection;
+const ElfSection = @import("parser").ElfSection;
 
 pub fn buildShstrtab(linker: *ElfLinker) !void {
     var data = std.ArrayList(u8).init(linker.allocator);

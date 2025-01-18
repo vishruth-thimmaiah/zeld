@@ -28,7 +28,7 @@ pub const ElfHeader = struct {
         @memcpy(magic[0..], bytes[0..16]);
 
         if (!std.mem.eql(u8, magic[0..4], &magic_bytes)) {
-            std.debug.print("Error: File is not an ELF file\n", .{});
+            std.debug.panic("Error: File is not an ELF file\n", .{});
         }
 
         const endian = getEndianness(magic);

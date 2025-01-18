@@ -1,8 +1,7 @@
-const ElfLinker = @import("linker.zig").ElfLinker;
-const parser = @import("../parser/elf.zig");
-const ElfSymbol = @import("../parser/symbols.zig").ElfSymbol;
-
 const std = @import("std");
+
+const parser = @import("parser");
+const ElfLinker = @import("linker.zig").ElfLinker;
 
 pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64) !void {
     var self_symbols = std.StringHashMap(usize).init(linker.allocator);

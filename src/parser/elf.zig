@@ -1,9 +1,9 @@
 const std = @import("std");
-const ElfHeader = @import("header.zig").ElfHeader;
-const ElfSectionHeader = @import("sheader.zig").SectionHeader;
-const ElfSection = @import("sections.zig").ElfSection;
-const ElfSymbol = @import("symbols.zig").ElfSymbol;
-const ElfRelocations = @import("relocations.zig").ElfRelocations;
+pub const ElfHeader = @import("header.zig").ElfHeader;
+pub const ElfSectionHeader = @import("sheader.zig").SectionHeader;
+pub const ElfSection = @import("sections.zig").ElfSection;
+pub const ElfSymbol = @import("symbols.zig").ElfSymbol;
+pub const ElfRelocations = @import("relocations.zig").ElfRelocations;
 
 pub const Elf64 = struct {
     header: ElfHeader,

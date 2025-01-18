@@ -1,5 +1,4 @@
 const std = @import("std");
-const print = std.debug.print;
 
 const ElfHeader = @import("header.zig").ElfHeader;
 const ElfSectionHeader = @import("sheader.zig").SectionHeader;

@@ -1,11 +1,10 @@
 const std = @import("std");
 
-const ElfHeader = @import("../parser/header.zig").ElfHeader;
-const ElfSectionHeader = @import("../parser/sheader.zig").SectionHeader;
-const ElfSection = @import("../parser/sections.zig").ElfSection;
-const ElfSymbol = @import("../parser/symbols.zig").ElfSymbol;
-const ElfRelocations = @import("../parser/relocations.zig").ElfRelocations;
-const parser = @import("../parser/elf.zig");
+const parser = @import("parser");
+const ElfHeader = parser.ElfHeader;
+const ElfSectionHeader = parser.ElfSectionHeader;
+const ElfSection = parser.ElfSection;
+const ElfSymbol = parser.ElfSymbol;
 
 pub const MutElf64 = struct {
     header: ElfHeader,

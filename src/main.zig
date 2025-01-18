@@ -1,6 +1,7 @@
 const std = @import("std");
-const parser = @import("parser/elf.zig");
-const linker = @import("linking/linker.zig").ElfLinker;
+
+const parser = @import("parser");
+const linker = @import("linker").ElfLinker;
 
 const print = std.debug.print;
 

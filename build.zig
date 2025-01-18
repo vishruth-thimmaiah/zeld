@@ -15,12 +15,27 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    const parser = b.addModule("parser", .{ 
+        .target = target, 
+        .optimize = optimize, 
+        .root_source_file = .{ .cwd_relative = "src/parser/elf.zig" } 
+    });
+
+    const linker = b.addModule("linker", .{ 
+        .target = target, 
+        .optimize = optimize, 
+        .root_source_file = .{ .cwd_relative = "src/linking/linker.zig" } 
+    });
+    linker.addImport("parser", parser);
+
     const exe = b.addExecutable(.{
         .name = "linkk",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
+    exe.root_module.addImport("parser", parser);
+    exe.root_module.addImport("linker", linker);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default

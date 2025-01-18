@@ -1,20 +1,19 @@
 const std = @import("std");
-const parser = @import("../parser/elf.zig");
+const parser = @import("parser");
 
 const sectionLinker = @import("sections/sections.zig");
-const buildShstrtab = @import("sections/shstrtab.zig").buildShstrtab;
 const symbolLinker = @import("symbols.zig");
-const mutElf64 = @import("mutelf.zig").MutElf64;
+const MutElf64 = @import("mutelf.zig").MutElf64;
 
 pub const ElfLinker = struct {
     files: []const parser.Elf64,
     out: parser.Elf64,
-    mutElf: mutElf64,
+    mutElf: MutElf64,
 
     allocator: std.mem.Allocator,
 
     pub fn new(allocator: std.mem.Allocator, files: []const parser.Elf64) !ElfLinker {
-        const mutElf = try mutElf64.new(allocator, files[0]);
+        const mutElf = try MutElf64.new(allocator, files[0]);
         errdefer mutElf.deinit();
 
         return ElfLinker{
@@ -33,7 +32,7 @@ pub const ElfLinker = struct {
 
             try self.merge(file);
         }
-        try buildShstrtab(self);
+        try sectionLinker.buildShstrtab(self);
         self.out = try self.mutElf.toElf64();
     }
 

@@ -1,9 +1,12 @@
-const ElfLinker = @import("../linker.zig").ElfLinker;
-const parser = @import("../../parser/elf.zig");
-
 const std = @import("std");
 
+const ElfLinker = @import("../linker.zig").ElfLinker;
+const parser = @import("parser");
+
+pub const buildShstrtab = @import("shstrtab.zig").buildShstrtab;
+
 pub fn mergeSections(linker: *const ElfLinker, file: parser.Elf64) !void {
+    
     var self_sections = std.StringHashMap(usize).init(linker.allocator);
     defer self_sections.deinit();
 

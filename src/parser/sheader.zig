@@ -1,4 +1,5 @@
 const std = @import("std");
+
 const ElfHeader = @import("header.zig").ElfHeader;
 
 pub const SectionHeader = struct {
