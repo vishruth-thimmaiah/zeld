@@ -32,6 +32,7 @@ pub const ElfLinker = struct {
 
             try self.merge(file);
         }
+        try sectionLinker.addRelocationSections(self);
         try sectionLinker.buildShstrtab(self);
         self.out = try self.mutElf.toElf64();
     }
@@ -50,6 +51,9 @@ pub const ElfLinker = struct {
     pub fn deinit(self: *const ElfLinker) void {
         for (self.out.sections) |section| {
             self.allocator.free(section.data);
+            if (section.name.len > 4 and std.mem.eql(u8, section.name[0..5], ".rela")) {
+                self.allocator.free(section.name);
+            }
             if (section.relocations) |relocations| {
                 self.allocator.free(relocations);
             }

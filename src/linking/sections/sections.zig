@@ -5,6 +5,7 @@ const parser = @import("parser");
 const ElfRelocations = parser.ElfRelocations;
 
 pub const buildShstrtab = @import("shstrtab.zig").buildShstrtab;
+pub const addRelocationSections = @import("relocations.zig").addRelocationSections;
 
 pub fn mergeSections(linker: *ElfLinker, file: parser.Elf64) !void {
     
