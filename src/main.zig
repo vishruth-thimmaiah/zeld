@@ -2,6 +2,7 @@ const std = @import("std");
 
 const parser = @import("parser");
 const linker = @import("linker").ElfLinker;
+const writer = @import("writer");
 
 const print = std.debug.print;
 
@@ -54,4 +55,6 @@ pub fn main() !void {
         print("Section: {s}, {}\n", .{section.name, section.data.len});
         print("Data: {any}\n\n", .{section});
     }
+
+    try writer.writer(elfLinker.out, "testbin");
 }

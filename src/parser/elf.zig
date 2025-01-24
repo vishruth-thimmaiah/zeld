@@ -4,6 +4,7 @@ pub const ElfSectionHeader = @import("sheader.zig").SectionHeader;
 pub const ElfSection = @import("sections.zig").ElfSection;
 pub const ElfSymbol = @import("symbols.zig").ElfSymbol;
 pub const ElfRelocations = @import("relocations.zig").ElfRelocations;
+pub const MAGIC_BYTES = [4]u8{ 0x7F, 0x45, 0x4C, 0x46 };
 
 pub const Elf64 = struct {
     header: ElfHeader,

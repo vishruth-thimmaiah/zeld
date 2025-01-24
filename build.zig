@@ -28,6 +28,13 @@ pub fn build(b: *std.Build) void {
     });
     linker.addImport("parser", parser);
 
+    const writer = b.addModule("writer", .{ 
+        .target = target, 
+        .optimize = optimize, 
+        .root_source_file = .{ .cwd_relative = "src/writer/writer.zig" } 
+    });
+    writer.addImport("parser", parser);
+
     const exe = b.addExecutable(.{
         .name = "linkk",
         .root_source_file = b.path("src/main.zig"),
@@ -36,6 +43,7 @@ pub fn build(b: *std.Build) void {
     });
     exe.root_module.addImport("parser", parser);
     exe.root_module.addImport("linker", linker);
+    exe.root_module.addImport("writer", writer);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
