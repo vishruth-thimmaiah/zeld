@@ -2,6 +2,8 @@ const std = @import("std");
 
 const parser = @import("parser");
 const ElfLinker = @import("linker.zig").ElfLinker;
+const ElfSymbol = parser.ElfSymbol;
+const ElfSection = parser.ElfSection;
 
 pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64) !void {
     var self_symbols = std.StringHashMap(usize).init(linker.allocator);
@@ -21,4 +23,71 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64) !void {
             try linker.mutElf.symbols.append(symbol);
         }
     }
+}
+
+pub fn addSymbolSections(self: *ElfLinker) !void {
+    var names = std.ArrayList(u8).init(self.allocator);
+    defer names.deinit();
+
+    const symbols = self.mutElf.symbols.items;
+    const section = try buildSymbolSection(self.allocator, symbols, &names);
+    try self.mutElf.sections.append(section);
+
+    const strtab = ElfSection {
+        .name = ".strtab",
+        .type = 3,
+        .flags = 0,
+        .addr = 0,
+        .link = 0,
+        .info = 0,
+        .addralign = 1,
+        .data = try names.toOwnedSlice(),
+        .relocations = null,
+
+        .allocator = self.allocator,
+    };
+    try self.mutElf.sections.append(strtab);
+}
+
+fn buildSymbolSection(allocator: std.mem.Allocator, symbol: []const ElfSymbol, names: *std.ArrayList(u8)) !ElfSection {
+
+    
+    var data = std.ArrayList(u8).init(allocator);
+    defer data.deinit();
+
+    for (symbol) |sym| {
+        try names.appendSlice(sym.name);
+        try names.append(0);
+
+        const offset = names.items.len;
+        var name: [8]u8 = undefined;
+        std.mem.writeInt(usize, &name, offset, std.builtin.Endian.little);
+        var shndx: [2]u8 = undefined;
+        std.mem.writeInt(u16, &shndx, sym.shndx, std.builtin.Endian.little);
+        var value: [8]u8 = undefined;
+        std.mem.writeInt(u64, &value, sym.value, std.builtin.Endian.little);
+        var size: [8]u8 = undefined;
+        std.mem.writeInt(u64, &size, sym.size, std.builtin.Endian.little);
+
+        try data.appendSlice(name[0..4]);
+        try data.append(sym.info);
+        try data.append(sym.other);
+        try data.appendSlice(&shndx);
+        try data.appendSlice(&value);
+        try data.appendSlice(&size);
+    }
+
+    return ElfSection{
+        .name = ".symtab",
+        .data = try data.toOwnedSlice(),
+        .type = 2,
+        .flags = 0,
+        .addr = 0,
+        .link = 0,
+        .info = 0,
+        .addralign = 8,
+        .relocations = null,
+
+        .allocator = allocator,
+    };
 }

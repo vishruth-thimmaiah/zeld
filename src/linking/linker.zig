@@ -32,6 +32,7 @@ pub const ElfLinker = struct {
 
             try self.merge(file);
         }
+        try symbolLinker.addSymbolSections(self);
         try sectionLinker.addRelocationSections(self);
         try sectionLinker.buildShstrtab(self);
         self.out = try self.mutElf.toElf64();
