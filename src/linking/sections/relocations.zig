@@ -5,19 +5,30 @@ const parser = @import("parser");
 const ElfSection = parser.ElfSection;
 const ElfRelocation = parser.ElfRelocations;
 
-pub fn addRelocationSections(self: *ElfLinker) !void {
-    var count: usize = 0;
+pub fn addRelocationSections(self: *ElfLinker, symbols_index: usize) !void {
     const sections = &self.mutElf.sections.items;
-    while (count < sections.len) : (count += 1) {
+    for (0..sections.len) |count| {
         const section = sections.*[count];
         if (section.relocations) |relocations| {
-            const relocSection = try buildRelocationSection(self.allocator, relocations, section.name);
+            const relocSection = try buildRelocationSection(
+                self.allocator,
+                relocations,
+                section.name,
+                count,
+                symbols_index,
+            );
             try self.mutElf.sections.append(relocSection);
         }
     }
 }
 
-fn buildRelocationSection(allocator: std.mem.Allocator, relocations: []const ElfRelocation, name: []const u8) !ElfSection {
+fn buildRelocationSection(
+    allocator: std.mem.Allocator,
+    relocations: []const ElfRelocation,
+    name: []const u8,
+    sh_info: usize,
+    symbols_index: usize,
+) !ElfSection {
     var data = try std.ArrayList(u8).initCapacity(allocator, relocations.len * 24);
     defer data.deinit();
 
@@ -42,8 +53,8 @@ fn buildRelocationSection(allocator: std.mem.Allocator, relocations: []const Elf
         .type = 4,
         .flags = 0,
         .addr = 0,
-        .link = 0,
-        .info = 0,
+        .link = @intCast(symbols_index + 1),
+        .info = @intCast(sh_info + 1),
         .addralign = 8,
         .relocations = null,
         .entsize = 24,

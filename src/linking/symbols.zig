@@ -25,13 +25,15 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64) !void {
     }
 }
 
-pub fn addSymbolSections(self: *ElfLinker) !void {
+pub fn addSymbolSections(self: *ElfLinker) !usize {
     var names = std.ArrayList(u8).init(self.allocator);
     defer names.deinit();
 
     const symbols = self.mutElf.symbols.items;
-    const section = try buildSymbolSection(self.allocator, symbols, &names);
+    const symbols_index = self.mutElf.sections.items.len;
+    const section = try buildSymbolSection(self.allocator, symbols, &names, symbols_index + 1);
     try self.mutElf.sections.append(section);
+
 
     const strtab = ElfSection {
         .name = ".strtab",
@@ -48,9 +50,10 @@ pub fn addSymbolSections(self: *ElfLinker) !void {
         .allocator = self.allocator,
     };
     try self.mutElf.sections.append(strtab);
+    return symbols_index;
 }
 
-fn buildSymbolSection(allocator: std.mem.Allocator, symbol: []const ElfSymbol, names: *std.ArrayList(u8)) !ElfSection {
+fn buildSymbolSection(allocator: std.mem.Allocator, symbol: []const ElfSymbol, names: *std.ArrayList(u8), symbols_index: usize) !ElfSection {
 
     
     var data = std.ArrayList(u8).init(allocator);
@@ -84,7 +87,7 @@ fn buildSymbolSection(allocator: std.mem.Allocator, symbol: []const ElfSymbol, n
         .type = 2,
         .flags = 0,
         .addr = 0,
-        .link = 0,
+        .link = @intCast(symbols_index + 1),
         .info = 0,
         .addralign = 8,
         .relocations = null,

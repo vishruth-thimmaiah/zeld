@@ -51,8 +51,8 @@ pub fn main() !void {
 
     print("Section count: {d}\n", .{elfLinker.out.sections.len});
 
-    for (elfLinker.out.sections) |section| {
-        print("Section: {s}, {}\n", .{section.name, section.data.len});
+    for (elfLinker.out.sections, 1..) |section, i| {
+        print("Section {d}: {s}, {}\n", .{i, section.name, section.data.len});
         print("Data: {any}\n\n", .{section});
     }
 
