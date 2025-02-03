@@ -12,7 +12,7 @@ pub fn addRelocationSections(self: *ElfLinker) !void {
         const section = sections.*[count];
         if (section.relocations) |relocations| {
             const relocSection = try buildRelocationSection(self.allocator, relocations, section.name);
-            try self.mutElf.sections.insert(count + 1, relocSection);
+            try self.mutElf.sections.append(relocSection);
         }
     }
 }
