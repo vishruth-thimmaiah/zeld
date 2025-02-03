@@ -12,7 +12,7 @@ pub const ElfRelocations = struct {
         var relocations = try std.ArrayList(ElfRelocations).initCapacity(allocator, section.data.len / 24);
         defer relocations.deinit();
 
-        for (0..section.data.len / 24) |i| {
+        for (0..section.data.len / section.entsize) |i| {
             const offset = i * 24;
             const rela = ElfRelocations{
                 .offset = std.mem.readInt(u64, section.data[offset .. offset + 8][0..8], header.data),

@@ -42,6 +42,7 @@ pub fn addSymbolSections(self: *ElfLinker) !void {
         .info = 0,
         .addralign = 1,
         .data = try names.toOwnedSlice(),
+        .entsize = 0,
         .relocations = null,
 
         .allocator = self.allocator,
@@ -87,6 +88,7 @@ fn buildSymbolSection(allocator: std.mem.Allocator, symbol: []const ElfSymbol, n
         .info = 0,
         .addralign = 8,
         .relocations = null,
+        .entsize = 24,
 
         .allocator = allocator,
     };

@@ -22,6 +22,7 @@ pub fn buildShstrtab(linker: *ElfLinker) !void {
         .addralign = 1,
         .data = try data.toOwnedSlice(),
         .relocations = null,
+        .entsize = 0,
 
         .allocator = linker.allocator,
     };

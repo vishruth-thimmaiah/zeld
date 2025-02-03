@@ -46,6 +46,7 @@ fn buildRelocationSection(allocator: std.mem.Allocator, relocations: []const Elf
         .info = 0,
         .addralign = 8,
         .relocations = null,
+        .entsize = 24,
 
         .allocator = allocator,
     };

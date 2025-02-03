@@ -13,6 +13,7 @@ pub const ElfSection = struct {
     info: u32,
     addralign: u64,
     data: []const u8,
+    entsize: u64,
     relocations: ?[]ElfRelocations,
 
     allocator: std.mem.Allocator,
@@ -36,6 +37,7 @@ pub const ElfSection = struct {
                 .info = sheader.info,
                 .addralign = sheader.addralign,
                 .data = try allocator.dupe(u8, bytes[sheader.offset .. sheader.offset + sheader.size]),
+                .entsize = sheader.entsize,
                 .relocations = null,
 
                 .allocator = allocator,
