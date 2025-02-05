@@ -7,6 +7,8 @@ pub fn buildSHeaders(allocator: std.mem.Allocator, sections: []const parser.ElfS
     var sheaders = std.ArrayList(parser.ElfSectionHeader).init(allocator);
     defer sheaders.deinit();
 
+    try sheaders.append(std.mem.zeroes(parser.ElfSectionHeader));
+
     var offset: usize = 64;
 
     for (sections) |section| {
