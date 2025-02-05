@@ -10,6 +10,8 @@ pub fn writeHeader(header: parser.ElfHeader) ![64]u8 {
     bytes[7] = header.osabi;
     bytes[8] = header.abiversion;
 
+    @memset(bytes[9..16], 0);
+
     bytes[16..18].* = std.mem.toBytes(header.type);
     bytes[18..20].* = std.mem.toBytes(header.machine);
     bytes[20..24].* = std.mem.toBytes(header.file_version);

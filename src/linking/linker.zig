@@ -35,6 +35,7 @@ pub const ElfLinker = struct {
         const symbols_index = try symbolLinker.addSymbolSections(self);
         try sectionLinker.addRelocationSections(self, symbols_index);
         try sectionLinker.buildShstrtab(self);
+        self.updateHeader();
         self.out = try self.mutElf.toElf64();
     }
 
@@ -47,6 +48,20 @@ pub const ElfLinker = struct {
     fn merge(self: *ElfLinker, file: parser.Elf64) !void {
         try sectionLinker.mergeSections(self, file);
         try symbolLinker.mergeSymbols(self, file);
+    }
+
+    fn updateHeader(self: *ElfLinker) void {
+
+        var shoff: u64 = self.mutElf.header.ehsize;
+        var shnum: u16 = 1;
+        for (self.mutElf.sections.items) |*section| {
+            shoff += section.data.len;
+            shnum += 1;
+        }
+
+        self.mutElf.header.shoff = shoff;
+        self.mutElf.header.shnum = shnum;
+        self.mutElf.header.shstrndx = shnum - 1;
     }
 
     pub fn deinit(self: *const ElfLinker) void {
