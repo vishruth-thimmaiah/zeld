@@ -34,9 +34,10 @@ pub const ElfLinker = struct {
         }
         const symbols_index = try symbolLinker.addSymbolSections(self);
         try sectionLinker.addRelocationSections(self, symbols_index);
-        try sectionLinker.buildShstrtab(self);
+        var shstrtab_names = try sectionLinker.buildShstrtab(self);
+        defer shstrtab_names.deinit();
         self.updateHeader();
-        self.out = try self.mutElf.toElf64();
+        self.out = try self.mutElf.toElf64(shstrtab_names);
     }
 
     fn verify(self: *ElfLinker, file: parser.Elf64) void {

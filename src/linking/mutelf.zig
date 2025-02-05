@@ -29,10 +29,10 @@ pub const MutElf64 = struct {
         };
     }
 
-    pub fn toElf64(self: *MutElf64) !parser.Elf64 {
+    pub fn toElf64(self: *MutElf64, shstrtab_names: std.StringHashMap(u32)) !parser.Elf64 {
         return parser.Elf64{
             .header = self.header,
-            .sheaders = try buildSHeaders(self.allocator, self.sections.items),
+            .sheaders = try buildSHeaders(self.allocator, self.sections.items, shstrtab_names),
             .symbols = try self.symbols.toOwnedSlice(),
             .sections = try self.sections.toOwnedSlice(),
             .all_sections = undefined,
