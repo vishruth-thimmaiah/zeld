@@ -34,8 +34,7 @@ pub fn addSymbolSections(self: *ElfLinker) !usize {
     const section = try buildSymbolSection(self.allocator, symbols, &names, symbols_index + 1);
     try self.mutElf.sections.append(section);
 
-
-    const strtab = ElfSection {
+    const strtab = ElfSection{
         .name = ".strtab",
         .type = 3,
         .flags = 0,
@@ -53,19 +52,26 @@ pub fn addSymbolSections(self: *ElfLinker) !usize {
     return symbols_index;
 }
 
-fn buildSymbolSection(allocator: std.mem.Allocator, symbol: []const ElfSymbol, names: *std.ArrayList(u8), symbols_index: usize) !ElfSection {
-
-    
+fn buildSymbolSection(
+    allocator: std.mem.Allocator,
+    symbol: []const ElfSymbol,
+    names: *std.ArrayList(u8),
+    symbols_index: usize,
+) !ElfSection {
     var data = std.ArrayList(u8).init(allocator);
     defer data.deinit();
 
     for (symbol) |sym| {
+        if (sym.name.len == 0) {
+            continue;
+        }
+        const offset: u32 = @intCast(names.items.len);
+
         try names.appendSlice(sym.name);
         try names.append(0);
 
-        const offset = names.items.len;
-        var name: [8]u8 = undefined;
-        std.mem.writeInt(usize, &name, offset, std.builtin.Endian.little);
+        var name: [4]u8 = undefined;
+        std.mem.writeInt(u32, &name, offset, std.builtin.Endian.little);
         var shndx: [2]u8 = undefined;
         std.mem.writeInt(u16, &shndx, sym.shndx, std.builtin.Endian.little);
         var value: [8]u8 = undefined;
@@ -73,7 +79,7 @@ fn buildSymbolSection(allocator: std.mem.Allocator, symbol: []const ElfSymbol, n
         var size: [8]u8 = undefined;
         std.mem.writeInt(u64, &size, sym.size, std.builtin.Endian.little);
 
-        try data.appendSlice(name[0..4]);
+        try data.appendSlice(&name);
         try data.append(sym.info);
         try data.append(sym.other);
         try data.appendSlice(&shndx);
@@ -88,7 +94,7 @@ fn buildSymbolSection(allocator: std.mem.Allocator, symbol: []const ElfSymbol, n
         .flags = 0,
         .addr = 0,
         .link = @intCast(symbols_index + 1),
-        .info = 0,
+        .info = @intCast(symbols_index),
         .addralign = 8,
         .relocations = null,
         .entsize = 24,
