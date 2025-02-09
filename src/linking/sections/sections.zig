@@ -8,8 +8,7 @@ const helpers = @import("../helpers.zig");
 pub const buildShstrtab = @import("shstrtab.zig").buildShstrtab;
 pub const addRelocationSections = @import("relocations.zig").addRelocationSections;
 
-pub fn mergeSections(linker: *ElfLinker, file: parser.Elf64) !void {
-    
+pub fn sectionReferences(linker: *ElfLinker, file: parser.Elf64) ![]?usize {
     var self_sections = std.StringHashMap(usize).init(linker.allocator);
     defer self_sections.deinit();
 
@@ -17,8 +16,23 @@ pub fn mergeSections(linker: *ElfLinker, file: parser.Elf64) !void {
         try self_sections.put(section.name, i);
     }
 
-    for (file.sections) |section| {
+    var referenced_sections = try linker.allocator.alloc(?usize, file.sections.len);
+
+    for (file.sections, 0..) |section, i| {
         if (self_sections.get(section.name)) |index| {
+            referenced_sections[i] = index;
+        } else {
+            referenced_sections[i] = null;
+        }
+    }
+    return referenced_sections;
+}
+
+pub fn mergeSections(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !void {
+    
+    for (refs, 0..) |ref, idx| {
+        const section = file.sections[idx];
+        if (ref) |index| {
             const original_section = linker.mutElf.sections.items[index];
             linker.mutElf.sections.items[index].data = try mergeData(linker, original_section.data, section.data);
             linker.mutElf.sections.items[index].relocations = try mergeRelas(linker, original_section, section.relocations);
