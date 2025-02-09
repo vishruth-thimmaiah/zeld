@@ -29,7 +29,6 @@ pub fn sectionReferences(linker: *ElfLinker, file: parser.Elf64) ![]?usize {
 }
 
 pub fn mergeSections(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !void {
-    
     for (refs, 0..) |ref, idx| {
         const section = file.sections[idx];
         if (ref) |index| {
@@ -50,12 +49,17 @@ fn mergeData(linker: *const ElfLinker, main: []const u8, other: []const u8) ![]c
 fn mergeRelas(linker: *const ElfLinker, self_section: parser.ElfSection, other: ?[]ElfRelocations) !?[]ElfRelocations {
     const main = self_section.relocations;
     if (main == null and other == null) return null;
+
+    if (other) |_| {
+        const alignment = helpers.getAlignment(self_section.data.len, self_section.addralign);
+        for (other.?) |*rela| {
+            rela.offset += alignment;
+        }
+    }
+
     // FIXME: Avoid allocating a new array to avoid double freeing if possible
     if (main == null or other == null) return try linker.allocator.dupe(ElfRelocations, main orelse other.?);
-    const alignment = helpers.getAlignment(self_section.data.len, self_section.addralign);
-    for (other.?) |*rela| {
-        rela.offset += alignment;
-    }
+
     const relas = &.{ main.?, other.? };
     const concated_relas = try std.mem.concat(linker.allocator, ElfRelocations, relas);
     return concated_relas;
