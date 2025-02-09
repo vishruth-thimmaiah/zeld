@@ -38,7 +38,7 @@ fn buildRelocationSection(
         var info: [8]u8 = undefined;
         std.mem.writeInt(u64, &info, reloc.info, std.builtin.Endian.little);
         var addend: [8]u8 = undefined;
-        std.mem.writeInt(u64, &addend, reloc.addend, std.builtin.Endian.little);
+        std.mem.writeInt(i64, &addend, reloc.addend, std.builtin.Endian.little);
 
         try data.appendSlice(&offset);
         try data.appendSlice(&info);

@@ -6,7 +6,7 @@ const ElfSection = @import("sections.zig").ElfSection;
 pub const ElfRelocations = struct {
     offset: u64,
     info: u64,
-    addend: u64,
+    addend: i64,
 
     pub fn new(allocator: std.mem.Allocator, header: ElfHeader, section: ElfSection) ![]ElfRelocations {
         var relocations = try std.ArrayList(ElfRelocations).initCapacity(allocator, section.data.len / 24);
@@ -17,7 +17,7 @@ pub const ElfRelocations = struct {
             const rela = ElfRelocations{
                 .offset = std.mem.readInt(u64, section.data[offset .. offset + 8][0..8], header.data),
                 .info = std.mem.readInt(u64, section.data[offset + 8 .. offset + 16][0..8], header.data),
-                .addend = std.mem.readInt(u64, section.data[offset + 16 .. offset + 24][0..8], header.data),
+                .addend = std.mem.readInt(i64, section.data[offset + 16 .. offset + 24][0..8], header.data),
             };
             try relocations.append(rela);
         }
