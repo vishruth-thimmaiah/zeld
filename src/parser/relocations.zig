@@ -30,4 +30,20 @@ pub const ElfRelocations = struct {
         const relas = try ElfRelocations.new(allocator, header, rela_section);
         section.relocations = relas;
     }
+
+    pub fn get_symbol(self: ElfRelocations) usize {
+        return self.info >> 32;
+    }
+
+    pub fn set_symbol(self: *ElfRelocations, symbol: usize) void {
+        self.info = (symbol << 32) + self.get_type();
+    }
+
+    pub fn get_type(self: ElfRelocations) usize {
+        return self.info & 0xffffffff;
+    }
+
+    pub fn set_type(self: *ElfRelocations, typeval: usize) void {
+        self.info = self.get_symbol() << 32 + typeval;
+    }
 };
