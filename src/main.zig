@@ -56,5 +56,5 @@ pub fn main() !void {
         print("Data: {any}\n\n", .{section});
     }
 
-    try writer.writer(elfLinker.out, "zig-out/testbin");
+    try writer.writer(elfLinker.out, "zig-out/testbin.o");
 }
