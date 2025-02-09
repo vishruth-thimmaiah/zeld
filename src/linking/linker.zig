@@ -49,7 +49,7 @@ pub const ElfLinker = struct {
     fn merge(self: *ElfLinker, file: parser.Elf64) !void {
         const refs = try sectionLinker.sectionReferences(self, file);
         defer self.allocator.free(refs);
-        try symbolLinker.mergeSymbols(self, file);
+        try symbolLinker.mergeSymbols(self, file, refs);
         try sectionLinker.mergeSections(self, file, refs);
     }
 

@@ -5,7 +5,7 @@ const ElfLinker = @import("linker.zig").ElfLinker;
 const ElfSymbol = parser.ElfSymbol;
 const ElfSection = parser.ElfSection;
 
-pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64) !void {
+pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !void {
     var self_symbols = std.StringHashMap(usize).init(linker.allocator);
     defer self_symbols.deinit();
 
@@ -16,11 +16,19 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64) !void {
     for (linker.mutElf.symbols.items, 0..) |*symbol, i| {
         try self_symbols.put(symbol.name, i);
     }
-    for (file.symbols[1..], 1..) |symbol, i| {
+    for (file.symbols[1..], 1..) |*symbol, i| {
+        if (symbol.shndx != 0 and symbol.shndx != 0xFFF1) {
+            if (refs[symbol.shndx]) |idx| {
+                symbol.shndx = @intCast(idx);
+            }
+            else {
+                symbol.shndx = @intCast(linker.mutElf.sections.items.len);
+            }
+        }
         const existing = self_symbols.get(symbol.name);
         if (existing) |idx| {
             if (symbol.shndx != 0) {
-                try linker.mutElf.symbols.append(symbol);
+                try linker.mutElf.symbols.append(symbol.*);
                 _ = linker.mutElf.symbols.swapRemove(idx);
                 symbol_indexes[i] = idx;
             } else {
@@ -28,7 +36,7 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64) !void {
                 symbol_indexes[i] = idx;
             }
         } else {
-            try linker.mutElf.symbols.append(symbol);
+            try linker.mutElf.symbols.append(symbol.*);
             symbol_indexes[i] = linker.mutElf.symbols.items.len - 1;
         }
     }
