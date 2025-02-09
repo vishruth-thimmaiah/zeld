@@ -3,6 +3,7 @@ const std = @import("std");
 const ElfLinker = @import("../linker.zig").ElfLinker;
 const parser = @import("parser");
 const ElfRelocations = parser.ElfRelocations;
+const helpers = @import("../helpers.zig");
 
 pub const buildShstrtab = @import("shstrtab.zig").buildShstrtab;
 pub const addRelocationSections = @import("relocations.zig").addRelocationSections;
@@ -20,7 +21,7 @@ pub fn mergeSections(linker: *ElfLinker, file: parser.Elf64) !void {
         if (self_sections.get(section.name)) |index| {
             const original_section = linker.mutElf.sections.items[index];
             linker.mutElf.sections.items[index].data = try mergeData(linker, original_section.data, section.data);
-            linker.mutElf.sections.items[index].relocations = try mergeRelas(linker, original_section.relocations, section.relocations);
+            linker.mutElf.sections.items[index].relocations = try mergeRelas(linker, original_section, section.relocations);
         } else {
             try linker.mutElf.sections.append(section);
         }
@@ -32,10 +33,15 @@ fn mergeData(linker: *const ElfLinker, main: []const u8, other: []const u8) ![]c
     return concated_data;
 }
 
-fn mergeRelas(linker: *const ElfLinker, main: ?[]ElfRelocations, other: ?[]ElfRelocations) !?[]ElfRelocations {
+fn mergeRelas(linker: *const ElfLinker, self_section: parser.ElfSection, other: ?[]ElfRelocations) !?[]ElfRelocations {
+    const main = self_section.relocations;
     if (main == null and other == null) return null;
     // FIXME: Avoid allocating a new array to avoid double freeing if possible
     if (main == null or other == null) return try linker.allocator.dupe(ElfRelocations, main orelse other.?);
+    const alignment = helpers.getAlignment(self_section.data.len, self_section.addralign);
+    for (other.?) |*rela| {
+        rela.offset += alignment;
+    }
     const relas = &.{ main.?, other.? };
     const concated_relas = try std.mem.concat(linker.allocator, ElfRelocations, relas);
     return concated_relas;
