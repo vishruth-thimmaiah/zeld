@@ -16,9 +16,12 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64) !void {
         if (symbol.name.len == 0) {
             continue;
         }
-        if (self_symbols.get(symbol.name)) |idx| {
-            try linker.mutElf.symbols.append(symbol);
-            _ = linker.mutElf.symbols.swapRemove(idx);
+        const existing = self_symbols.get(symbol.name);
+        if (existing) |idx| {
+            if (symbol.shndx != 0) {
+                try linker.mutElf.symbols.append(symbol);
+                _ = linker.mutElf.symbols.swapRemove(idx);
+            }
         } else {
             try linker.mutElf.symbols.append(symbol);
         }
@@ -62,9 +65,6 @@ fn buildSymbolSection(
     defer data.deinit();
 
     for (symbol) |sym| {
-        if (sym.name.len == 0) {
-            continue;
-        }
         const offset: u32 = @intCast(names.items.len);
 
         try names.appendSlice(sym.name);
