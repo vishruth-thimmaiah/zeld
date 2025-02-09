@@ -44,7 +44,12 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !voi
     for (file.sections) |*section| {
         if (section.relocations) |relocations| {
             for (relocations) |*rela| {
-                rela.set_symbol(symbol_indexes[rela.get_symbol()]);
+                const symbol = symbol_indexes[rela.get_symbol()];
+                rela.set_symbol(symbol);
+                const sym = file.symbols[symbol];
+                if (sym.info == 3) {
+                    rela.addend += @intCast(linker.mutElf.sections.items[sym.shndx - 1].data.len);
+                }
             }
         }
     }
