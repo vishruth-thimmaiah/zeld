@@ -47,12 +47,11 @@ pub const ElfLinker = struct {
     }
 
     fn merge(self: *ElfLinker, file: parser.Elf64) !void {
-        try sectionLinker.mergeSections(self, file);
         try symbolLinker.mergeSymbols(self, file);
+        try sectionLinker.mergeSections(self, file);
     }
 
     fn updateHeader(self: *ElfLinker) void {
-
         var shoff: u64 = self.mutElf.header.ehsize;
         var shnum: u16 = 1;
         for (self.mutElf.sections.items) |*section| {

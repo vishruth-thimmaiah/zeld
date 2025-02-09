@@ -9,21 +9,35 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64) !void {
     var self_symbols = std.StringHashMap(usize).init(linker.allocator);
     defer self_symbols.deinit();
 
+    var symbol_indexes = try linker.allocator.alloc(usize, file.symbols.len);
+    defer linker.allocator.free(symbol_indexes);
+    symbol_indexes[0] = 0;
+
     for (linker.mutElf.symbols.items, 0..) |*symbol, i| {
         try self_symbols.put(symbol.name, i);
     }
-    for (file.symbols) |symbol| {
-        if (symbol.name.len == 0) {
-            continue;
-        }
+    for (file.symbols[1..], 1..) |symbol, i| {
         const existing = self_symbols.get(symbol.name);
         if (existing) |idx| {
             if (symbol.shndx != 0) {
                 try linker.mutElf.symbols.append(symbol);
                 _ = linker.mutElf.symbols.swapRemove(idx);
+                symbol_indexes[i] = idx;
+            } else {
+                //TODO
+                symbol_indexes[i] = idx;
             }
         } else {
             try linker.mutElf.symbols.append(symbol);
+            symbol_indexes[i] = linker.mutElf.symbols.items.len - 1;
+        }
+    }
+
+    for (file.sections) |*section| {
+        if (section.relocations) |relocations| {
+            for (relocations) |*rela| {
+                rela.set_symbol(symbol_indexes[rela.get_symbol()]);
+            }
         }
     }
 }
