@@ -20,6 +20,7 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !voi
         if (symbol.shndx != 0 and symbol.shndx != 0xFFF1) {
             if (refs[symbol.shndx]) |idx| {
                 symbol.shndx = @intCast(idx);
+                symbol.value += linker.mutElf.sections.items[symbol.shndx - 1].data.len;
             }
             else {
                 symbol.shndx = @intCast(linker.mutElf.sections.items.len);
