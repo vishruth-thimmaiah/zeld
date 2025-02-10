@@ -13,9 +13,16 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !voi
     defer linker.allocator.free(symbol_indexes);
     symbol_indexes[0] = 0;
 
+    var global_start: usize = 0;
+
     for (linker.mutElf.symbols.items, 0..) |*symbol, i| {
         try self_symbols.put(symbol.name, i);
+        if (symbol.get_bind() != 1 and global_start == 0) {
+            global_start = i;
+        }
     }
+    const global_ptr = global_start;
+
     for (file.symbols[1..], 1..) |*symbol, i| {
         if (symbol.shndx != 0 and symbol.shndx != 0xFFF1) {
             if (refs[symbol.shndx]) |idx| {
@@ -23,24 +30,31 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !voi
                 if (symbol.get_bind() == 1) {
                     symbol.value += linker.mutElf.sections.items[symbol.shndx - 1].data.len;
                 }
-            }
-            else {
+            } else {
                 symbol.shndx = @intCast(linker.mutElf.sections.items.len);
             }
         }
         const existing = self_symbols.get(symbol.name);
         if (existing) |idx| {
             if (symbol.shndx != 0) {
-                try linker.mutElf.symbols.append(symbol.*);
-                _ = linker.mutElf.symbols.swapRemove(idx);
-                symbol_indexes[i] = idx;
-            } else {
-                //TODO
-                symbol_indexes[i] = idx;
+                linker.mutElf.symbols.items[idx + (global_start - global_ptr)] = symbol.*;
             }
-        } else {
+            symbol_indexes[i] = idx;
+        } else if (symbol.get_bind() == 1) {
             try linker.mutElf.symbols.append(symbol.*);
             symbol_indexes[i] = linker.mutElf.symbols.items.len - 1;
+        } else {
+            try linker.mutElf.symbols.insert(global_start, symbol.*);
+            symbol_indexes[i] = global_start;
+            global_start += 1;
+        }
+    }
+
+    for (linker.mutElf.sections.items) |*section| {
+        if (section.relocations) |relocations| {
+            for (relocations) |*rela| {
+                rela.set_symbol(rela.get_symbol() + (global_start - global_ptr));
+            }
         }
     }
 
@@ -48,7 +62,7 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !voi
         if (section.relocations) |relocations| {
             for (relocations) |*rela| {
                 const symbol = symbol_indexes[rela.get_symbol()];
-                rela.set_symbol(symbol);
+                rela.set_symbol(symbol + (global_start - global_ptr));
                 const sym = file.symbols[symbol];
                 if (sym.info == 3) {
                     rela.addend += @intCast(linker.mutElf.sections.items[sym.shndx - 1].data.len);
@@ -58,13 +72,18 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !voi
     }
 }
 
-pub fn addSymbolSections(self: *ElfLinker) !usize {
+pub fn addSymbolSections(self: *ElfLinker) !void {
     var names = std.ArrayList(u8).init(self.allocator);
     defer names.deinit();
 
     const symbols = self.mutElf.symbols.items;
     const symbols_index = self.mutElf.sections.items.len;
-    const section = try buildSymbolSection(self.allocator, symbols, &names, symbols_index + 1);
+    const section = try buildSymbolSection(
+        self.allocator,
+        symbols,
+        &names,
+        symbols_index + 1,
+    );
     try self.mutElf.sections.append(section);
 
     const strtab = ElfSection{
@@ -82,7 +101,6 @@ pub fn addSymbolSections(self: *ElfLinker) !usize {
         .allocator = self.allocator,
     };
     try self.mutElf.sections.append(strtab);
-    return symbols_index;
 }
 
 fn buildSymbolSection(
@@ -95,7 +113,12 @@ fn buildSymbolSection(
     defer data.deinit();
     try names.append(0);
 
-    for (symbol) |sym| {
+    var global_start: usize = 0;
+
+    for (symbol, 0..) |sym, i| {
+        if (global_start == 0 and sym.get_bind() == 1) {
+            global_start = i;
+        }
 
         var name: [4]u8 = undefined;
 
@@ -130,7 +153,7 @@ fn buildSymbolSection(
         .flags = 0,
         .addr = 0,
         .link = @intCast(symbols_index + 1),
-        .info = @intCast(symbols_index),
+        .info = @intCast(global_start),
         .addralign = 8,
         .relocations = null,
         .entsize = 24,
