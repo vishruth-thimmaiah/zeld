@@ -32,8 +32,8 @@ pub const ElfLinker = struct {
 
             try self.merge(file);
         }
-        const symbols_index = try symbolLinker.addSymbolSections(self);
-        try sectionLinker.addRelocationSections(self, symbols_index);
+        try symbolLinker.addSymbolSections(self);
+        try sectionLinker.addRelocationSections(self);
         var shstrtab_names = try sectionLinker.buildShstrtab(self);
         defer shstrtab_names.deinit();
         self.updateHeader();
