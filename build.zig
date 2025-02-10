@@ -15,28 +15,28 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const parser = b.addModule("parser", .{ 
-        .target = target, 
-        .optimize = optimize, 
-        .root_source_file = .{ .cwd_relative = "src/parser/elf.zig" } 
+    const parser = b.addModule("parser", .{
+        .target = target,
+        .optimize = optimize,
+        .root_source_file = .{ .cwd_relative = "src/parser/elf.zig" },
     });
 
-    const linker = b.addModule("linker", .{ 
-        .target = target, 
-        .optimize = optimize, 
-        .root_source_file = .{ .cwd_relative = "src/linking/linker.zig" } 
+    const linker = b.addModule("linker", .{
+        .target = target,
+        .optimize = optimize,
+        .root_source_file = .{ .cwd_relative = "src/linking/linker.zig" },
     });
     linker.addImport("parser", parser);
 
-    const writer = b.addModule("writer", .{ 
-        .target = target, 
-        .optimize = optimize, 
-        .root_source_file = .{ .cwd_relative = "src/writer/writer.zig" } 
+    const writer = b.addModule("writer", .{
+        .target = target,
+        .optimize = optimize,
+        .root_source_file = .{ .cwd_relative = "src/writer/writer.zig" },
     });
     writer.addImport("parser", parser);
 
     const exe = b.addExecutable(.{
-        .name = "linkk",
+        .name = "zeld",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,

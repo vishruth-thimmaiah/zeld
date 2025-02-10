@@ -1,8 +1,6 @@
-# Linkk
-A (WIP) linker built with zig.
+# Zeld
+A basic linker built with zig.
 
-> [!WARNING]
-> This project is a W.I.P.
 
 ## Build:
 ```bash
