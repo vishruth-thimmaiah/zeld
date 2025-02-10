@@ -90,15 +90,21 @@ fn buildSymbolSection(
 ) !ElfSection {
     var data = std.ArrayList(u8).init(allocator);
     defer data.deinit();
+    try names.append(0);
 
     for (symbol) |sym| {
-        const offset: u32 = @intCast(names.items.len);
-
-        try names.appendSlice(sym.name);
-        try names.append(0);
 
         var name: [4]u8 = undefined;
-        std.mem.writeInt(u32, &name, offset, std.builtin.Endian.little);
+
+        if (sym.name.len != 0) {
+            const offset: u32 = @intCast(names.items.len);
+            std.mem.writeInt(u32, &name, offset, std.builtin.Endian.little);
+            try names.appendSlice(sym.name);
+            try names.append(0);
+        } else {
+            name = std.mem.zeroes([4]u8);
+        }
+
         var shndx: [2]u8 = undefined;
         std.mem.writeInt(u16, &shndx, sym.shndx, std.builtin.Endian.little);
         var value: [8]u8 = undefined;
