@@ -39,6 +39,14 @@ pub const ElfSymbol = struct {
         return symbols.toOwnedSlice();
     }
 
+    pub fn get_bind(self: ElfSymbol) usize {
+        return self.info >> 4;
+    }
+
+    pub fn get_type(self: ElfSymbol) usize {
+        return self.info & 0xf;
+    }
+
     fn getSymbolName(idx: u32, bytes: []const u8) ![]const u8 {
         var end_offset = idx;
 
