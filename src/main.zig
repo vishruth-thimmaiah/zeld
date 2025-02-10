@@ -49,12 +49,5 @@ pub fn main() !void {
     defer elfLinker.deinit();
     try elfLinker.link();
 
-    print("Section count: {d}\n", .{elfLinker.out.sections.len});
-
-    for (elfLinker.out.sections, 1..) |section, i| {
-        print("Section {d}: {s}, {}\n", .{i, section.name, section.data.len});
-        print("Data: {any}\n\n", .{section});
-    }
-
     try writer.writer(elfLinker.out, "zig-out/testbin.o");
 }
