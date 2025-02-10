@@ -12,6 +12,8 @@ pub fn buildShstrtab(linker: *ElfLinker) !std.StringHashMap(u32) {
 
     for (linker.mutElf.sections.items) |section| {
         if (section.relocations != null) {
+            try data.appendSlice(section.name);
+            try data.append(0);
             continue;
         }
         if (section.type == 4) {
