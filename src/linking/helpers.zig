@@ -1,5 +1,5 @@
 pub fn getAlignment(size: u64, alignment: u64) u64 {
-    if (trailingZeros(size) == trailingZeros(size)) {
+    if (trailingZeros(size) == trailingZeros(alignment)) {
         return size;
     }
     if (alignment == 0 or alignment == 1) {

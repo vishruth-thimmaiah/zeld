@@ -32,26 +32,27 @@ pub fn mergeSections(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !vo
     for (refs, 0..) |ref, idx| {
         const section = file.sections[idx];
         if (ref) |index| {
-            const original_section = linker.mutElf.sections.items[index];
-            linker.mutElf.sections.items[index].data = try mergeData(linker, original_section.data, section.data);
-            linker.mutElf.sections.items[index].relocations = try mergeRelas(linker, original_section, section.relocations);
+            const original_section = &linker.mutElf.sections.items[index];
+            const alignment = helpers.getAlignment(original_section.data.len, original_section.addralign);
+            original_section.data = try mergeData(linker, original_section.data, section.data, alignment);
+            original_section.relocations = try mergeRelas(linker, original_section.relocations, section.relocations, alignment);
         } else {
             try linker.mutElf.sections.append(section);
         }
     }
 }
-fn mergeData(linker: *const ElfLinker, main: []const u8, other: []const u8) ![]const u8 {
-    const data = &.{ main, other };
-    const concated_data = try std.mem.concat(linker.allocator, u8, data);
+fn mergeData(linker: *const ElfLinker, main: []const u8, other: []const u8, alignment: u64) ![]const u8 {
+    var concated_data = try linker.allocator.alloc(u8, other.len + alignment);
+    @memcpy(concated_data[0..main.len], main);
+    @memset(concated_data[main.len..alignment], 0xFF);
+    @memcpy(concated_data[alignment..], other);
     return concated_data;
 }
 
-fn mergeRelas(linker: *const ElfLinker, self_section: parser.ElfSection, other: ?[]ElfRelocations) !?[]ElfRelocations {
-    const main = self_section.relocations;
+fn mergeRelas(linker: *const ElfLinker, main: ?[]ElfRelocations, other: ?[]ElfRelocations, alignment: u64) !?[]ElfRelocations {
     if (main == null and other == null) return null;
 
     if (other) |_| {
-        const alignment = helpers.getAlignment(self_section.data.len, self_section.addralign);
         for (other.?) |*rela| {
             rela.offset += alignment;
         }
