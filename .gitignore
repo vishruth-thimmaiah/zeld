@@ -1,5 +1,6 @@
 .zig-cache
 zig-out
+a.out
 
 examples/**/*.o
 examples/**/*.out

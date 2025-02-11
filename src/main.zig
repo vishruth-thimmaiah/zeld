@@ -3,6 +3,7 @@ const std = @import("std");
 const parser = @import("parser");
 const linker = @import("linker").ElfLinker;
 const writer = @import("writer");
+const Args = @import("args.zig").Args;
 
 const print = std.debug.print;
 
@@ -12,42 +13,34 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
-    var argsIter = std.process.argsWithAllocator(allocator) catch |err| {
-        print("Failed to get args: {s}\n", .{@errorName(err)});
-        return;
+    const args = Args.parse(allocator) catch |err| {
+        print("Error {s}: Failed to parse args\n", .{@errorName(err)});
+        std.process.exit(1);
     };
-    defer argsIter.deinit();
-
-    _ = argsIter.next();
-
-    var args = std.ArrayList([]const u8).init(allocator);
     defer args.deinit();
-    while (argsIter.next()) |arg| {
-        try args.append(arg);
-    }
-
-    if (args.items.len == 0) {
-        print("No files specified\n", .{});
-        return;
-    }
 
     var elfFiles = std.ArrayList(parser.Elf64).init(allocator);
-    defer elfFiles.deinit();
-
-    for (args.items) |arg| {
-        const file = try std.fs.cwd().openFile(arg, .{});
-        defer file.close();
-        const elfObj = try parser.Elf64.new(allocator, file);
-        try elfFiles.append(elfObj);
-    }
     defer {
         for (elfFiles.items) |elfObj| {
             elfObj.deinit();
         }
+        elfFiles.deinit();
     }
+
+    for (args.inputs) |arg| {
+        const file = std.fs.cwd().openFile(arg, .{}) catch |err| {
+            std.debug.print("Error {s}: Failed to open '{s}'\n", .{ @errorName(err), arg });
+            std.process.exit(1);
+        };
+        defer file.close();
+
+        const elfObj = try parser.Elf64.new(allocator, file);
+        try elfFiles.append(elfObj);
+    }
+
     var elfLinker = try linker.new(allocator, elfFiles.items);
     defer elfLinker.deinit();
     try elfLinker.link();
 
-    try writer.writer(elfLinker.out, "zig-out/testbin.o");
+    try writer.writer(elfLinker.out, args.output);
 }
