@@ -1,5 +1,5 @@
 const std = @import("std");
-const helpers = @import("helpers.zig");
+const helpers = @import("tests.zig");
 
 test "basic" {
     const test_c =
