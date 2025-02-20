@@ -1,4 +1,5 @@
 const std = @import("std");
+const utils = @import("utils.zig");
 
 const ElfHeader = @import("header.zig").ElfHeader;
 const ElfSectionHeader = @import("sheader.zig").SectionHeader;
@@ -23,14 +24,14 @@ pub const ElfSymbol = struct {
 
         for (0..symtab_header.size / symtab_header.entsize) |i| {
             const offset = symtab_header.entsize * i;
-            const name_offset = std.mem.readInt(u32, symtab.data[offset .. offset + 4][0..4], header.data);
+            const name_offset = utils.readInt(u32, symtab.data, offset, header.data);
             const symbol = ElfSymbol{
                 .name = try getSymbolName(name_offset, string_section.data),
-                .info = std.mem.readInt(u8, symtab.data[offset + 4 .. offset + 5][0..1], header.data),
-                .other = std.mem.readInt(u8, symtab.data[offset + 5 .. offset + 6][0..1], header.data),
-                .shndx = std.mem.readInt(u16, symtab.data[offset + 6 .. offset + 8][0..2], header.data),
-                .value = std.mem.readInt(u64, symtab.data[offset + 8 .. offset + 16][0..8], header.data),
-                .size = std.mem.readInt(u64, symtab.data[offset + 16 .. offset + 24][0..8], header.data),
+                .info = utils.readInt(u8, symtab.data, offset + 4, header.data),
+                .other = utils.readInt(u8, symtab.data, offset + 5, header.data),
+                .shndx = utils.readInt(u16, symtab.data, offset + 6, header.data),
+                .value = utils.readInt(u64, symtab.data, offset + 8, header.data),
+                .size = utils.readInt(u64, symtab.data, offset + 16, header.data),
             };
 
             try symbols.append(symbol);

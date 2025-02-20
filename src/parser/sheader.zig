@@ -1,4 +1,5 @@
 const std = @import("std");
+const utils = @import("utils.zig");
 
 const ElfHeader = @import("header.zig").ElfHeader;
 
@@ -22,25 +23,25 @@ pub const SectionHeader = struct {
         defer headers.deinit();
 
         for (fheader.shnum) |_| {
-            var link = std.mem.readInt(u32, bytes[offset + 40 .. offset + 44][0..4], endian);
+            var link = utils.readInt(u32, bytes, offset + 40, endian);
             if (link != 0) {
                 link -= 1;
             }
-            var info = std.mem.readInt(u32, bytes[offset + 44 .. offset + 48][0..4], endian);
+            var info = utils.readInt(u32, bytes, offset + 44, endian);
             if (info != 0) {
                 info -= 1;
             }
             const header = SectionHeader{
-                .name = std.mem.readInt(u32, bytes[offset .. offset + 4][0..4], endian),
-                .type = std.mem.readInt(u32, bytes[offset + 4 .. offset + 8][0..4], endian),
-                .flags = std.mem.readInt(u64, bytes[offset + 8 .. offset + 16][0..8], endian),
-                .addr = std.mem.readInt(u64, bytes[offset + 16 .. offset + 24][0..8], endian),
-                .offset = std.mem.readInt(u64, bytes[offset + 24 .. offset + 32][0..8], endian),
-                .size = std.mem.readInt(u64, bytes[offset + 32 .. offset + 40][0..8], endian),
+                .name = utils.readInt(u32, bytes, offset, endian),
+                .type = utils.readInt(u32, bytes, offset + 4, endian),
+                .flags = utils.readInt(u64, bytes, offset + 8, endian),
+                .addr = utils.readInt(u64, bytes, offset + 16, endian),
+                .offset = utils.readInt(u64, bytes, offset + 24, endian),
+                .size = utils.readInt(u64, bytes, offset + 32, endian),
                 .link = link,
                 .info = info,
-                .addralign = std.mem.readInt(u64, bytes[offset + 48 .. offset + 56][0..8], endian),
-                .entsize = std.mem.readInt(u64, bytes[offset + 56 .. offset + 64][0..8], endian),
+                .addralign = utils.readInt(u64, bytes, offset + 48, endian),
+                .entsize = utils.readInt(u64, bytes, offset + 56, endian),
             };
             if (header.type != 0) {
                 try headers.append(header);

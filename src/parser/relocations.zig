@@ -1,4 +1,5 @@
 const std = @import("std");
+const utils = @import("utils.zig");
 
 const ElfHeader = @import("header.zig").ElfHeader;
 const ElfSection = @import("sections.zig").ElfSection;
@@ -15,9 +16,9 @@ pub const ElfRelocations = struct {
         for (0..section.data.len / section.entsize) |i| {
             const offset = i * 24;
             const rela = ElfRelocations{
-                .offset = std.mem.readInt(u64, section.data[offset .. offset + 8][0..8], header.data),
-                .info = std.mem.readInt(u64, section.data[offset + 8 .. offset + 16][0..8], header.data),
-                .addend = std.mem.readInt(i64, section.data[offset + 16 .. offset + 24][0..8], header.data),
+                .offset = utils.readInt(u64, section.data, offset, header.data),
+                .info = utils.readInt(u64, section.data, offset + 8, header.data),
+                .addend = utils.readInt(i64, section.data, offset + 16, header.data),
             };
             try relocations.append(rela);
         }
