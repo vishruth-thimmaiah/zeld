@@ -36,9 +36,9 @@ pub const Elf64 = struct {
 
         for (sheaders, 0..) |sheader, i| {
             try switch (sheader.type) {
-                2 => symtab_index = i,
-                3 => {},
-                4 => rela_indexes.append([2]usize{ i, special_section_count }),
+                .SHT_SYMTAB => symtab_index = i,
+                .SHT_STRTAB => {},
+                .SHT_RELA => rela_indexes.append([2]usize{ i, special_section_count }),
                 else => {
                     try sections.append(all_sections[i]);
                     continue;
@@ -74,15 +74,12 @@ pub const Elf64 = struct {
             .allocator = allocator,
         };
     }
+
     pub fn deinit(self: *const Elf64) void {
+        for (self.symbols) |symbol| symbol.deinit();
+        for (self.sections) |section| section.deinit();
         self.allocator.free(self.sheaders);
-        for (self.symbols) |symbol| {
-            symbol.deinit();
-        }
         self.allocator.free(self.symbols);
-        for (self.sections) |section| {
-            section.deinit();
-        }
         self.allocator.free(self.sections);
     }
 };

@@ -16,7 +16,7 @@ pub fn buildShstrtab(linker: *ElfLinker) !std.StringHashMap(u32) {
             try data.append(0);
             continue;
         }
-        if (section.type == 4) {
+        if (section.type == .SHT_RELA) {
             try names.put(section.name[5..], @intCast(data.items.len + 5));
         }
         try names.put(section.name, @intCast(data.items.len));
@@ -28,7 +28,7 @@ pub fn buildShstrtab(linker: *ElfLinker) !std.StringHashMap(u32) {
 
     const shstrtab = ElfSection{
         .name = ".shstrtab",
-        .type = 3,
+        .type = .SHT_STRTAB,
         .flags = 0,
         .addr = 0,
         .link = 0,

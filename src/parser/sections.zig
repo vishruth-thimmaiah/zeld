@@ -1,12 +1,12 @@
 const std = @import("std");
 
 const ElfHeader = @import("header.zig").ElfHeader;
-const ElfSectionHeader = @import("sheader.zig").SectionHeader;
+const ElfSectionHeader = @import("sheader.zig");
 const ElfRelocations = @import("relocations.zig").ElfRelocations;
 
 pub const ElfSection = struct {
     name: []const u8,
-    type: u32,
+    type: ElfSectionHeader.SHType,
     flags: u64,
     addr: u64,
     link: u32,
@@ -18,7 +18,7 @@ pub const ElfSection = struct {
 
     allocator: std.mem.Allocator,
 
-    pub fn new(allocator: std.mem.Allocator, bytes: []const u8, header: ElfHeader, sheaders: []ElfSectionHeader) ![]ElfSection {
+    pub fn new(allocator: std.mem.Allocator, bytes: []const u8, header: ElfHeader, sheaders: []ElfSectionHeader.SectionHeader) ![]ElfSection {
         const string_section = sheaders[header.shstrndx];
 
         var sections = try std.ArrayList(ElfSection).initCapacity(allocator, sheaders.len);
@@ -55,7 +55,7 @@ pub const ElfSection = struct {
         self.allocator.free(self.data);
     }
 
-    fn getSectionName(idx: u32, bytes: []const u8, string_header: ElfSectionHeader) ![]const u8 {
+    fn getSectionName(idx: u32, bytes: []const u8, string_header: ElfSectionHeader.SectionHeader) ![]const u8 {
         const start_offset = string_header.offset + idx;
         var end_offset = start_offset;
 

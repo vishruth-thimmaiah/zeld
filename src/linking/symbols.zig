@@ -88,7 +88,7 @@ pub fn addSymbolSections(self: *ElfLinker) !void {
 
     const strtab = ElfSection{
         .name = ".strtab",
-        .type = 3,
+        .type = .SHT_STRTAB,
         .flags = 0,
         .addr = 0,
         .link = 0,
@@ -149,7 +149,7 @@ fn buildSymbolSection(
     return ElfSection{
         .name = ".symtab",
         .data = try data.toOwnedSlice(),
-        .type = 2,
+        .type = .SHT_SYMTAB,
         .flags = 0,
         .addr = 0,
         .link = @intCast(symbols_index + 1),

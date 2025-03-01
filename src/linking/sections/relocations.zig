@@ -51,7 +51,7 @@ fn buildRelocationSection(
     return ElfSection{
         .name = rela_name,
         .data = try data.toOwnedSlice(),
-        .type = 4,
+        .type = .SHT_RELA,
         .flags = 0,
         .addr = 0,
         .link = @intCast(sh_size),

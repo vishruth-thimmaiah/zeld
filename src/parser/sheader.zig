@@ -5,7 +5,7 @@ const ElfHeader = @import("header.zig").ElfHeader;
 
 pub const SectionHeader = struct {
     name: u32,
-    type: u32,
+    type: SHType,
     flags: u64,
     addr: u64,
     offset: u64,
@@ -33,7 +33,7 @@ pub const SectionHeader = struct {
             }
             const header = SectionHeader{
                 .name = utils.readInt(u32, bytes, offset, endian),
-                .type = utils.readInt(u32, bytes, offset + 4, endian),
+                .type = utils.readInt(SHType, bytes, offset + 4, endian),
                 .flags = utils.readInt(u64, bytes, offset + 8, endian),
                 .addr = utils.readInt(u64, bytes, offset + 16, endian),
                 .offset = utils.readInt(u64, bytes, offset + 24, endian),
@@ -43,11 +43,27 @@ pub const SectionHeader = struct {
                 .addralign = utils.readInt(u64, bytes, offset + 48, endian),
                 .entsize = utils.readInt(u64, bytes, offset + 56, endian),
             };
-            if (header.type != 0) {
+            if (header.type != .SHT_NULL) {
                 try headers.append(header);
             }
             offset += fheader.shentsize;
         }
         return headers.toOwnedSlice();
     }
+};
+
+pub const SHType = enum(u32) {
+    SHT_NULL,
+    SHT_PROGBITS,
+    SHT_SYMTAB,
+    SHT_STRTAB,
+    SHT_RELA,
+    SHT_HASH,
+    SHT_DYNAMIC,
+    SHT_NOTE,
+    SHT_NOBITS,
+    SHT_REL,
+    SHT_SHLIB,
+    SHT_DYNSYM,
+    _,
 };
