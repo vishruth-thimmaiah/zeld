@@ -18,7 +18,13 @@ pub const MutElf64 = struct {
         var mutSymbols = std.ArrayList(ElfSymbol).init(allocator);
         try mutSymbols.appendSlice(file.symbols);
         var mutSections = std.ArrayList(ElfSection).init(allocator);
-        try mutSections.appendSlice(file.sections);
+        for (file.sections, 0..) |symbol, idx| {
+            try mutSections.append(symbol);
+            mutSections.items[idx].data = try allocator.dupe(u8, symbol.data);
+            if (symbol.relocations) |relocations| {
+                mutSections.items[idx].relocations = try allocator.dupe(parser.ElfRelocations, relocations);
+            }
+        }
 
         return MutElf64{
             .header = file.header,
