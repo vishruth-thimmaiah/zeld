@@ -41,7 +41,6 @@ pub const MutElf64 = struct {
             .sheaders = try buildSHeaders(self.allocator, self.sections.items, shstrtab_names),
             .symbols = try self.symbols.toOwnedSlice(),
             .sections = try self.sections.toOwnedSlice(),
-            .all_sections = undefined,
 
             .allocator = self.allocator,
         };

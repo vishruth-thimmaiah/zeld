@@ -48,6 +48,9 @@ pub const ElfSection = struct {
     }
 
     pub fn deinit(self: *const ElfSection) void {
+        if (self.relocations) |relas| {
+            self.allocator.free(relas);
+        }
         self.allocator.free(self.name);
         self.allocator.free(self.data);
     }

@@ -25,8 +25,7 @@ pub const ElfRelocations = struct {
         return try relocations.toOwnedSlice();
     }
 
-    pub fn get(allocator: std.mem.Allocator, header: ElfHeader, sections: []ElfSection, rela_section: ElfSection, rela_info: usize) !void {
-        var section = &sections[rela_info];
+    pub fn updateSection(allocator: std.mem.Allocator, header: ElfHeader, section: *ElfSection, rela_section: ElfSection) !void {
 
         const relas = try ElfRelocations.new(allocator, header, rela_section);
         section.relocations = relas;

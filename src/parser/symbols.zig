@@ -13,25 +13,31 @@ pub const ElfSymbol = struct {
     value: u64,
     size: u64,
 
+    allocator: std.mem.Allocator,
+
     pub fn new(allocator: std.mem.Allocator, header: ElfHeader, sheaders: []ElfSectionHeader, sections: []ElfSection, symtab_index: usize) ![]ElfSymbol {
         var symbols = try std.ArrayList(ElfSymbol).initCapacity(allocator, sheaders.len);
         defer symbols.deinit();
 
         const symtab_header = sheaders[symtab_index];
         const symtab = sections[symtab_index];
+        defer symtab.deinit();
 
         const string_section = sections[symtab.link];
+        defer string_section.deinit();
 
         for (0..symtab_header.size / symtab_header.entsize) |i| {
             const offset = symtab_header.entsize * i;
             const name_offset = utils.readInt(u32, symtab.data, offset, header.data);
             const symbol = ElfSymbol{
-                .name = try getSymbolName(name_offset, string_section.data),
+                .name = try allocator.dupe(u8, getSymbolName(name_offset, string_section.data)),
                 .info = utils.readInt(u8, symtab.data, offset + 4, header.data),
                 .other = utils.readInt(u8, symtab.data, offset + 5, header.data),
                 .shndx = utils.readInt(u16, symtab.data, offset + 6, header.data),
                 .value = utils.readInt(u64, symtab.data, offset + 8, header.data),
                 .size = utils.readInt(u64, symtab.data, offset + 16, header.data),
+
+                .allocator = allocator,
             };
 
             try symbols.append(symbol);
@@ -48,7 +54,7 @@ pub const ElfSymbol = struct {
         return self.info & 0xf;
     }
 
-    fn getSymbolName(idx: u32, bytes: []const u8) ![]const u8 {
+    fn getSymbolName(idx: u32, bytes: []const u8) []const u8 {
         var end_offset = idx;
 
         while (true) {
@@ -59,5 +65,9 @@ pub const ElfSymbol = struct {
         }
 
         return bytes[idx..end_offset];
+    }
+
+    pub fn deinit(self: *const ElfSymbol) void {
+        self.allocator.free(self.name);
     }
 };
