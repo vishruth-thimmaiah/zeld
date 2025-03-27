@@ -14,7 +14,7 @@ pub const ElfRelocations = struct {
         defer relocations.deinit();
 
         for (0..section.data.len / section.entsize) |i| {
-            const offset = i * 24;
+            const offset = i * section.entsize;
             const rela = ElfRelocations{
                 .offset = utils.readInt(u64, section.data, offset, header.data),
                 .info = utils.readInt(u64, section.data, offset + 8, header.data),
