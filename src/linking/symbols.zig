@@ -5,6 +5,7 @@ const ElfLinker = @import("linker.zig").ElfLinker;
 const ElfSymbol = parser.ElfSymbol;
 const ElfSection = parser.ElfSection;
 
+
 pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !void {
     var self_symbols = std.StringHashMap(usize).init(linker.allocator);
     defer self_symbols.deinit();
@@ -13,17 +14,21 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !voi
     defer linker.allocator.free(symbol_indexes);
     symbol_indexes[0] = 0;
 
-    var global_start: usize = 0;
+    // Global symbols have to be added after the local ones.
+    var global_ptr: usize = 0;
 
     for (linker.mutElf.symbols.items, 0..) |*symbol, i| {
-        try self_symbols.put(symbol.name, i);
-        if (symbol.get_bind() != 1 and global_start == 0) {
-            global_start = i;
+        if (symbol.name.len != 0) {
+            try self_symbols.put(symbol.name, i);
+        }
+        if (symbol.get_bind() != 1 and global_ptr == 0) {
+            global_ptr = i;
         }
     }
-    const global_ptr = global_start;
+    const global_start = global_ptr;
 
     for (file.symbols[1..], 1..) |*symbol, i| {
+        const existing = self_symbols.get(symbol.name);
         if (symbol.shndx != 0 and symbol.shndx != 0xFFF1) {
             if (refs[symbol.shndx]) |idx| {
                 symbol.shndx = @intCast(idx);
@@ -34,26 +39,25 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !voi
                 symbol.shndx = @intCast(linker.mutElf.sections.items.len);
             }
         }
-        const existing = self_symbols.get(symbol.name);
         if (existing) |idx| {
             if (symbol.shndx != 0) {
-                linker.mutElf.symbols.items[idx + (global_start - global_ptr)] = symbol.*;
+                linker.mutElf.symbols.items[idx + (global_ptr - global_start)] = symbol.*;
             }
             symbol_indexes[i] = idx;
         } else if (symbol.get_bind() == 1) {
             try linker.mutElf.symbols.append(symbol.*);
             symbol_indexes[i] = linker.mutElf.symbols.items.len - 1;
         } else {
-            try linker.mutElf.symbols.insert(global_start, symbol.*);
-            symbol_indexes[i] = global_start;
-            global_start += 1;
+            try linker.mutElf.symbols.insert(global_ptr, symbol.*);
+            symbol_indexes[i] = global_ptr;
+            global_ptr += 1;
         }
     }
 
     for (linker.mutElf.sections.items) |*section| {
         if (section.relocations) |relocations| {
             for (relocations) |*rela| {
-                rela.set_symbol(rela.get_symbol() + (global_start - global_ptr));
+                rela.set_symbol(rela.get_symbol() + (global_ptr - global_start));
             }
         }
     }
@@ -62,7 +66,7 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, refs: []?usize) !voi
         if (section.relocations) |relocations| {
             for (relocations) |*rela| {
                 const symbol = symbol_indexes[rela.get_symbol()];
-                rela.set_symbol(symbol + (global_start - global_ptr));
+                rela.set_symbol(symbol + (global_ptr - global_start));
                 const sym = file.symbols[symbol];
                 if (sym.info == 3) {
                     rela.addend += @intCast(linker.mutElf.sections.items[sym.shndx - 1].data.len);
