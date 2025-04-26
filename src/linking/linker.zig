@@ -1,8 +1,10 @@
 const std = @import("std");
 const parser = @import("parser");
 
-const sectionLinker = @import("sections/sections.zig");
-const symbolLinker = @import("symbols.zig");
+const relocations = @import("relocations.zig");
+const shstrtab = @import("shstrtab.zig");
+const newSectionMerger = @import("sections.zig");
+const newSymbolMerger = @import("symbols.zig");
 const MutElf64 = @import("mutelf.zig").MutElf64;
 
 pub const ElfLinker = struct {
@@ -29,12 +31,13 @@ pub const ElfLinker = struct {
         errdefer self.mutElf.deinit();
         for (self.files) |file| {
             self.verify(file);
-
-            try self.merge(file);
+            var section_map = try newSectionMerger.mergeSections(self, file);
+            defer section_map.deinit();
+            try newSymbolMerger.mergeSymbols(self, file, section_map);
         }
-        try symbolLinker.addSymbolSections(self);
-        try sectionLinker.addRelocationSections(self);
-        var shstrtab_names = try sectionLinker.buildShstrtab(self);
+        try relocations.addRelocationSections(self);
+        try newSymbolMerger.addSymbolSections(self);
+        var shstrtab_names = try shstrtab.buildShstrtab(self);
         defer shstrtab_names.deinit();
         self.updateHeader();
         self.out = try self.mutElf.toElf64(shstrtab_names);
@@ -44,13 +47,6 @@ pub const ElfLinker = struct {
         if (self.mutElf.header.type != 1 or file.header.type != 1) {
             std.debug.panic("File type is not yet supported", .{});
         }
-    }
-
-    fn merge(self: *ElfLinker, file: parser.Elf64) !void {
-        const refs = try sectionLinker.sectionReferences(self, file);
-        defer self.allocator.free(refs);
-        try symbolLinker.mergeSymbols(self, file, refs);
-        try sectionLinker.mergeSections(self, file, refs);
     }
 
     fn updateHeader(self: *ElfLinker) void {
@@ -72,8 +68,8 @@ pub const ElfLinker = struct {
             if (section.name.len > 4 and std.mem.eql(u8, section.name[0..5], ".rela")) {
                 self.allocator.free(section.name);
             }
-            if (section.relocations) |relocations| {
-                self.allocator.free(relocations);
+            if (section.relocations) |rela| {
+                self.allocator.free(rela);
             }
         }
         self.allocator.free(self.out.sections);

@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const ElfLinker = @import("../linker.zig").ElfLinker;
+const ElfLinker = @import("linker.zig").ElfLinker;
 const parser = @import("parser");
 const ElfSection = parser.ElfSection;
 const ElfRelocation = parser.ElfRelocations;
@@ -8,6 +8,12 @@ const ElfRelocation = parser.ElfRelocations;
 pub fn addRelocationSections(self: *ElfLinker) !void {
     const sections = &self.mutElf.sections.items;
     const len = sections.len - 1;
+
+    var rela_indexes = std.ArrayList(struct { ElfSection, usize }).init(self.allocator);
+    defer rela_indexes.deinit();
+
+    var rela_count: u32 = 0;
+
     for (0..sections.len) |count| {
         const section = sections.*[count];
         if (section.relocations) |relocations| {
@@ -15,11 +21,19 @@ pub fn addRelocationSections(self: *ElfLinker) !void {
                 self.allocator,
                 relocations,
                 section.name,
-                len,
-                count,
+                len + 1,
+                count + rela_count,
             );
-            try self.mutElf.sections.append(relocSection);
+            try rela_indexes.append(.{ relocSection, count + rela_count + 1 });
+            rela_count += 1;
         }
+    }
+
+    for (rela_indexes.items) |relainfo| {
+        const idx = relainfo[1];
+        var rela = relainfo[0];
+        rela.link += rela_count + 1;
+        try self.mutElf.sections.insert(idx, rela);
     }
 }
 

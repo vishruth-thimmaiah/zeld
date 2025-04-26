@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const ElfLinker = @import("../linker.zig").ElfLinker;
+const ElfLinker = @import("linker.zig").ElfLinker;
 const ElfSection = @import("parser").ElfSection;
 
 pub fn buildShstrtab(linker: *ElfLinker) !std.StringHashMap(u32) {
