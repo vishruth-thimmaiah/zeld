@@ -27,7 +27,7 @@ fn build_bin(allocator: std.mem.Allocator, file: []const u8, output: []const u8)
 
 fn build_output(allocator: std.mem.Allocator, output: []const u8) !u8 {
     var build_command = std.process.Child.init(
-        &[_][]const u8{ "gcc", "zig-out/file3.o", "-o", output },
+        &[_][]const u8{ "gcc", "zig-out/tests/file3.o", "-o", output },
         allocator,
     );
 
@@ -35,9 +35,11 @@ fn build_output(allocator: std.mem.Allocator, output: []const u8) !u8 {
     _ = try build_command.wait();
 
     var run_command = std.process.Child.init(
-        &[_][]const u8{ output },
+        &[_][]const u8{output},
         allocator,
     );
+
+    run_command.stdout_behavior = .Ignore;
 
     try run_command.spawn();
     const result = try run_command.wait();
@@ -49,12 +51,12 @@ pub fn build(input_1: []const u8, input_2: []const u8) !u8 {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    try build_bin(allocator, input_1, "zig-out/file1.o");
-    try build_bin(allocator, input_2, "zig-out/file2.o");
+    try build_bin(allocator, input_1, "zig-out/tests/file1.o");
+    try build_bin(allocator, input_2, "zig-out/tests/file2.o");
 
-    const file1 = try std.fs.cwd().openFile("zig-out/file1.o", .{});
+    const file1 = try std.fs.cwd().openFile("zig-out/tests/file1.o", .{});
     defer file1.close();
-    const file2 = try std.fs.cwd().openFile("zig-out/file2.o", .{});
+    const file2 = try std.fs.cwd().openFile("zig-out/tests/file2.o", .{});
     defer file2.close();
 
     const elfFiles = [2]parser.Elf64{
@@ -72,9 +74,9 @@ pub fn build(input_1: []const u8, input_2: []const u8) !u8 {
     defer elfLinker.deinit();
     try elfLinker.link();
 
-    try writer.writer(elfLinker.out, "zig-out/file3.o");
+    try writer.writer(elfLinker.out, "zig-out/tests/file3.o");
 
-    const result = try build_output(allocator, "zig-out/file4.out");
+    const result = try build_output(allocator, "zig-out/tests/file4.out");
 
     return result;
 }

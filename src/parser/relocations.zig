@@ -26,7 +26,6 @@ pub const ElfRelocations = struct {
     }
 
     pub fn updateSection(allocator: std.mem.Allocator, header: ElfHeader, section: *ElfSection, rela_section: ElfSection) !void {
-
         const relas = try ElfRelocations.new(allocator, header, rela_section);
         section.relocations = relas;
     }
