@@ -8,17 +8,18 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, section_map: std.Str
     defer symbol_map.deinit();
 
     // Keep track of original global symbols
-    var original_globals = std.ArrayList([]const u8).init(linker.allocator);
-    defer original_globals.deinit();
+    var original_symbols = std.ArrayList([]const u8).init(linker.allocator);
+    defer original_symbols.deinit();
 
     // Globals come after local symbols
     var global_ptr: usize = 0;
 
     for (linker.mutElf.symbols.items, 0..) |*symbol, i| {
-        try symbol_map.put(get_symbol_name(linker.mutElf.symbols.items, linker.mutElf.sections.items, i), i);
-        if (symbol.get_bind() == 1) {
+        const name = get_symbol_name(linker.mutElf.symbols.items, linker.mutElf.sections.items, i);
+        try symbol_map.put(name, i);
+        try original_symbols.append(name);
+        if (symbol.get_bind() == 1 and global_ptr == 0) {
             global_ptr = i;
-            try original_globals.append(symbol.name);
         }
     }
 
@@ -58,7 +59,7 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, section_map: std.Str
     }
 
     // Update the indexes of the global symbols that were already in the map.
-    for (original_globals.items) |global| {
+    for (original_symbols.items[global_start..]) |global| {
         const val = try symbol_map.getOrPut(global);
         val.value_ptr.* += global_ptr - global_start;
     }
@@ -78,17 +79,17 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, section_map: std.Str
                 const name = get_symbol_name(file.symbols, file.sections, rela.get_symbol());
                 const idx = symbol_map.get(name).?;
 
-                const other_symbol = file.symbols[idx];
                 rela.set_symbol(idx);
                 const symbol = linker.mutElf.symbols.items[idx];
                 if (symbol.info == 3) {
+                    const other_symbol = file.symbols[idx];
                     const diff = linker.mutElf.sections.items[symbol.shndx - 1].data.len - file.sections[other_symbol.shndx - 1].data.len;
                     rela.addend += @intCast(diff);
                 }
             }
             // For old relocations, we just need to update the symbol indexes.
             for (original_rela[0 .. original_rela.len - new_relas]) |*rela| {
-                const name = get_symbol_name(linker.mutElf.symbols.items, linker.mutElf.sections.items, rela.get_symbol());
+                const name = original_symbols.items[rela.get_symbol()];
                 rela.set_symbol(symbol_map.get(name).?);
             }
         }
