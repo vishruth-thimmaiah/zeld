@@ -18,7 +18,7 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, section_map: std.Str
         const name = get_symbol_name(linker.mutElf.symbols.items, linker.mutElf.sections.items, i);
         try symbol_map.put(name, i);
         try original_symbols.append(name);
-        if (symbol.get_bind() == 1 and global_ptr == 0) {
+        if (symbol.get_bind() == .STB_GLOBAL and global_ptr == 0) {
             global_ptr = i;
         }
     }
@@ -34,7 +34,7 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, section_map: std.Str
             const old_section = file.sections[symbol.shndx - 1];
             symbol.shndx = get_section_of_symbol(symbol.*, file, section_map) + 1;
             // If the symbol's bind is global, we need to update the value. Here value is the offset from the start of the section.
-            if (symbol.get_bind() == 1) {
+            if (symbol.get_bind() == .STB_GLOBAL) {
                 const diff = linker.mutElf.sections.items[symbol.shndx - 1].data.len - old_section.data.len;
                 symbol.value += diff;
             }
@@ -48,7 +48,7 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, section_map: std.Str
             if (symbol.shndx != 0) {
                 linker.mutElf.symbols.items[index + (global_ptr - global_start)] = symbol.*;
             }
-        } else if (symbol.get_bind() == 1) {
+        } else if (symbol.get_bind() == .STB_GLOBAL) {
             try linker.mutElf.symbols.append(symbol.*);
             try symbol_map.put(get_symbol_name(file.symbols, file.sections, idx), linker.mutElf.symbols.items.len - 1);
         } else {
@@ -164,7 +164,7 @@ fn buildSymbolSection(
     var global_start: usize = 0;
 
     for (symbol, 0..) |sym, i| {
-        if (global_start == 0 and sym.get_bind() == 1) {
+        if (global_start == 0 and sym.get_bind() == .STB_GLOBAL) {
             global_start = i;
         }
 

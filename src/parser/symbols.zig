@@ -46,12 +46,12 @@ pub const ElfSymbol = struct {
         return symbols.toOwnedSlice();
     }
 
-    pub fn get_bind(self: ElfSymbol) usize {
-        return self.info >> 4;
+    pub fn get_bind(self: ElfSymbol) STBind {
+        return @enumFromInt(self.info >> 4);
     }
 
-    pub fn get_type(self: ElfSymbol) usize {
-        return self.info & 0xf;
+    pub fn get_type(self: ElfSymbol) STType {
+        return @enumFromInt(self.info & 0xf);
     }
 
     fn getSymbolName(idx: u32, bytes: []const u8) []const u8 {
@@ -70,4 +70,22 @@ pub const ElfSymbol = struct {
     pub fn deinit(self: *const ElfSymbol) void {
         self.allocator.free(self.name);
     }
+};
+
+pub const STBind = enum(usize) {
+    STB_LOCAL = 0,
+    STB_GLOBAL = 1,
+    STB_WEAK = 2,
+    STB_LOPROC = 13,
+    STB_HIPROC = 15,
+};
+
+pub const STType = enum(usize) {
+    STT_NOTYPE = 0,
+    STT_OBJECT = 1,
+    STT_FUNC = 2,
+    STT_SECTION = 3,
+    STT_FILE = 4,
+    STT_LOPROC = 13,
+    STT_HIPROC = 15,
 };
