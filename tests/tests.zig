@@ -9,7 +9,7 @@ comptime {
 
 fn build_bin(allocator: std.mem.Allocator, file: []const u8, output: []const u8) !void {
     var command = std.process.Child.init(
-        &[_][]const u8{ "gcc", "-xc", "-c", "-", "-o", output },
+        &[_][]const u8{ "gcc", "-o", output, "-xc", "-c", "-" },
         allocator,
     );
 
@@ -22,7 +22,10 @@ fn build_bin(allocator: std.mem.Allocator, file: []const u8, output: []const u8)
         try stdin.writer().writeAll(file);
     }
 
-    _ = try command.wait();
+    const result = try command.wait();
+    if (result.Exited != 0) {
+        return error.FailedToBuild;
+    }
 }
 
 fn build_output(allocator: std.mem.Allocator, output: []const u8) !u8 {
