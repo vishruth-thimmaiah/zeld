@@ -65,17 +65,21 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, section_map: std.Str
     }
 
     // Handles relocations
-    for (file.sections) |*section| {
+    for (linker.mutElf.sections.items) |*section| {
         if (section.relocations) |relocations| {
-            const new_relas = relocations.len;
-            const original_section_idx = section_map.get(section.name).?;
-            const original_sec = linker.mutElf.sections.items[original_section_idx];
-            var original_rela = original_sec.relocations.?;
+            const rela_len = relocations.len;
+            var other_relas: ?[]parser.ElfRelocations = undefined;
+            for (file.sections) |other_section| {
+                if (std.mem.eql(u8, other_section.name, section.name)) {
+                    other_relas = other_section.relocations;
+                }
+            }
+            const other_rela_count = if (other_relas) |rels| rels.len else 0;
 
             // For new relocations, we need to update the symbol indexes. We
             // also need to update the addend. This is equal to the size of the
             // initial section the associated symbol references.
-            for (original_rela[original_rela.len - new_relas ..]) |*rela| {
+            for (relocations[rela_len - other_rela_count ..]) |*rela| {
                 const name = get_symbol_name(file.symbols, file.sections, rela.get_symbol());
                 const idx = symbol_map.get(name).?;
 
@@ -88,7 +92,7 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, section_map: std.Str
                 }
             }
             // For old relocations, we just need to update the symbol indexes.
-            for (original_rela[0 .. original_rela.len - new_relas]) |*rela| {
+            for (relocations[0 .. rela_len - other_rela_count]) |*rela| {
                 const name = original_symbols.items[rela.get_symbol()];
                 rela.set_symbol(symbol_map.get(name).?);
             }
@@ -130,6 +134,7 @@ pub fn addSymbolSections(self: *ElfLinker) !void {
         self.allocator,
         symbols,
         &names,
+        self.mutElf.sections.items,
         symbols_index + 1,
     );
     try self.mutElf.sections.append(section);
@@ -155,11 +160,20 @@ fn buildSymbolSection(
     allocator: std.mem.Allocator,
     symbol: []const parser.ElfSymbol,
     names: *std.ArrayList(u8),
+    sections: []const parser.ElfSection,
     symbols_index: usize,
 ) !parser.ElfSection {
     var data = std.ArrayList(u8).init(allocator);
     defer data.deinit();
     try names.append(0);
+
+    var section_indexes = try allocator.alloc(u16, sections.len);
+    defer allocator.free(section_indexes);
+    var idx: usize = 0;
+    for (sections, 0..) |section, i| {
+        section_indexes[i] = @intCast(idx);
+        idx = if (section.relocations) |_| idx + 2 else idx + 1;
+    }
 
     var global_start: usize = 0;
 
@@ -180,7 +194,11 @@ fn buildSymbolSection(
         }
 
         var shndx: [2]u8 = undefined;
-        std.mem.writeInt(u16, &shndx, sym.shndx, std.builtin.Endian.little);
+        if (sym.shndx != 0 and sym.shndx < 0xFFF1) {
+            std.mem.writeInt(u16, &shndx, section_indexes[sym.shndx - 1] + 1, std.builtin.Endian.little);
+        } else {
+            std.mem.writeInt(u16, &shndx, sym.shndx, std.builtin.Endian.little);
+        }
         var value: [8]u8 = undefined;
         std.mem.writeInt(u64, &value, sym.value, std.builtin.Endian.little);
         var size: [8]u8 = undefined;

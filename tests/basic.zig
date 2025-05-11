@@ -16,9 +16,11 @@ test "basic" {
         \\ }
     ;
 
-    const result = try helpers.build(test_c, main_c);
+    const result1 = try helpers.build(test_c, main_c);
+    const result2 = try helpers.build(main_c, test_c);
 
-    try std.testing.expectEqual(5, result);
+    try std.testing.expectEqual(5, result1);
+    try std.testing.expectEqual(5, result2);
 }
 
 test "basic_with_print" {
@@ -38,7 +40,9 @@ test "basic_with_print" {
         \\     return greet();
         \\ }
     ;
-    const result = try helpers.build(test_c, main_c);
+    const result1 = try helpers.build(test_c, main_c);
+    // const result2 = try helpers.build(main_c, test_c);
 
-    try std.testing.expectEqual(3, result);
+    try std.testing.expectEqual(3, result1);
+    // try std.testing.expectEqual(3, result2);
 }

@@ -29,11 +29,12 @@ pub const ElfSymbol = struct {
         for (0..symtab_header.size / symtab_header.entsize) |i| {
             const offset = symtab_header.entsize * i;
             const name_offset = utils.readInt(u32, symtab.data, offset, header.data);
+            const shndx = utils.readInt(u16, symtab.data, offset + 6, header.data);
             const symbol = ElfSymbol{
                 .name = try allocator.dupe(u8, getSymbolName(name_offset, string_section.data)),
                 .info = utils.readInt(u8, symtab.data, offset + 4, header.data),
                 .other = utils.readInt(u8, symtab.data, offset + 5, header.data),
-                .shndx = utils.readInt(u16, symtab.data, offset + 6, header.data),
+                .shndx = updateShndx(sections, shndx),
                 .value = utils.readInt(u64, symtab.data, offset + 8, header.data),
                 .size = utils.readInt(u64, symtab.data, offset + 16, header.data),
 
@@ -71,6 +72,20 @@ pub const ElfSymbol = struct {
         self.allocator.free(self.name);
     }
 };
+
+fn updateShndx(sections: []ElfSection, shndx: u16) u16 {
+    if (shndx == 0 or shndx >= 0xFFF1) {
+        return shndx;
+    } else {
+        var new_shndx = shndx;
+        for (sections[0..shndx]) |section| {
+            if (section.type == .SHT_RELA or section.type == .SHT_REL) {
+                new_shndx -= 1;
+            }
+        }
+        return new_shndx;
+    }
+}
 
 pub const STBind = enum(usize) {
     STB_LOCAL = 0,
