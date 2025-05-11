@@ -37,9 +37,10 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, section_map: std.Str
         // * FIXME: For now, we assume that the symbol is global.
         // Otherwise, we either append it if it's a global symbol, or insert
         // it if it's a local symbol, right before the global symbol.
-        if (symbol_map.get(symbol.getDisplayName())) |index| {
+        if (symbol_map.get(symbol.getDisplayName())) |i| {
             if (symbol.shndx != .SHN_UNDEF) {
-                linker.mutElf.symbols.items[index + (global_ptr - global_start)] = symbol.*;
+                const index = if (symbol.get_bind() == .STB_GLOBAL) i + (global_ptr - global_start) else i;
+                linker.mutElf.symbols.items[index] = symbol.*;
             }
         } else if (symbol.get_bind() == .STB_GLOBAL) {
             try linker.mutElf.symbols.append(symbol.*);
@@ -160,7 +161,7 @@ fn buildSymbolSection(
 
         var name: [4]u8 = undefined;
 
-        if (sym.name.len != 0) {
+        if (sym.name.len != 0 and sym.get_type() != .STT_SECTION) {
             const offset: u32 = @intCast(names.items.len);
             std.mem.writeInt(u32, &name, offset, std.builtin.Endian.little);
             try names.appendSlice(sym.name);
