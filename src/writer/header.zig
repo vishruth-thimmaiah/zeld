@@ -1,9 +1,9 @@
 const std = @import("std");
-const parser = @import("parser");
+const elf = @import("elf");
 
-pub fn writeHeader(header: parser.ElfHeader) ![64]u8 {
+pub fn writeHeader(header: elf.Header) ![64]u8 {
     var bytes: [64]u8 = undefined;
-    bytes[0..4].* = parser.MAGIC_BYTES;
+    bytes[0..4].* = elf.MAGIC_BYTES;
     bytes[4] = header.class;
     bytes[5] = if (header.data == std.builtin.Endian.little) 1 else 2;
     bytes[6] = header.version;

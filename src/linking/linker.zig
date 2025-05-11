@@ -1,5 +1,5 @@
 const std = @import("std");
-const parser = @import("parser");
+const elf = @import("elf");
 
 const relocations = @import("relocations.zig");
 const shstrtab = @import("shstrtab.zig");
@@ -8,13 +8,13 @@ const newSymbolMerger = @import("symbols.zig");
 const MutElf64 = @import("mutelf.zig").MutElf64;
 
 pub const ElfLinker = struct {
-    files: []const parser.Elf64,
-    out: parser.Elf64,
+    files: []const elf.Elf64,
+    out: elf.Elf64,
     mutElf: MutElf64,
 
     allocator: std.mem.Allocator,
 
-    pub fn new(allocator: std.mem.Allocator, files: []const parser.Elf64) !ElfLinker {
+    pub fn new(allocator: std.mem.Allocator, files: []const elf.Elf64) !ElfLinker {
         const mutElf = try MutElf64.new(allocator, files[0]);
         errdefer mutElf.deinit();
 
@@ -43,7 +43,7 @@ pub const ElfLinker = struct {
         self.out = try self.mutElf.toElf64(shstrtab_names);
     }
 
-    fn verify(self: *ElfLinker, file: parser.Elf64) void {
+    fn verify(self: *ElfLinker, file: elf.Elf64) void {
         if (self.mutElf.header.type != 1 or file.header.type != 1) {
             std.debug.panic("File type is not yet supported", .{});
         }

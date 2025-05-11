@@ -1,163 +1,55 @@
 const std = @import("std");
 const utils = @import("utils.zig");
 
-const ElfHeader = @import("header.zig").ElfHeader;
-const ElfSectionHeader = @import("sheader.zig").SectionHeader;
-const ElfSection = @import("sections.zig").ElfSection;
+const elf = @import("elf");
 
-pub const ElfSymbol = struct {
-    name: []const u8, // Pointer is 32 bits.
-    info: u8,
-    other: u8,
-    shndx: STNdx,
-    value: u64,
-    size: u64,
-
+pub fn parse(
     allocator: std.mem.Allocator,
+    header: elf.Header,
+    sheaders: []elf.SectionHeader,
+    sections: []elf.Section,
+    symtab_index: usize,
+) ![]elf.Symbol {
+    var symbols = try std.ArrayList(elf.Symbol).initCapacity(allocator, sheaders.len);
+    defer symbols.deinit();
 
-    pub fn new(allocator: std.mem.Allocator, header: ElfHeader, sheaders: []ElfSectionHeader, sections: []ElfSection, symtab_index: usize) ![]ElfSymbol {
-        var symbols = try std.ArrayList(ElfSymbol).initCapacity(allocator, sheaders.len);
-        defer symbols.deinit();
+    const symtab_header = sheaders[symtab_index];
+    const symtab = sections[symtab_index];
+    defer symtab.deinit();
 
-        const symtab_header = sheaders[symtab_index];
-        const symtab = sections[symtab_index];
-        defer symtab.deinit();
+    const string_section = sections[symtab.link];
+    defer string_section.deinit();
 
-        const string_section = sections[symtab.link];
-        defer string_section.deinit();
+    for (0..symtab_header.size / symtab_header.entsize) |i| {
+        const offset = symtab_header.entsize * i;
+        const name_offset = utils.readInt(u32, symtab.data, offset, header.data);
+        const shndx = utils.readInt(u16, symtab.data, offset + 6, header.data);
+        const symbol = elf.Symbol{
+            .name = try allocator.dupe(u8, getSymbolName(name_offset, string_section.data)),
+            .info = utils.readInt(u8, symtab.data, offset + 4, header.data),
+            .other = utils.readInt(u8, symtab.data, offset + 5, header.data),
+            .shndx = elf.STNdx.fromInt(shndx, sections),
+            .value = utils.readInt(u64, symtab.data, offset + 8, header.data),
+            .size = utils.readInt(u64, symtab.data, offset + 16, header.data),
 
-        for (0..symtab_header.size / symtab_header.entsize) |i| {
-            const offset = symtab_header.entsize * i;
-            const name_offset = utils.readInt(u32, symtab.data, offset, header.data);
-            const shndx = utils.readInt(u16, symtab.data, offset + 6, header.data);
-            const symbol = ElfSymbol{
-                .name = try allocator.dupe(u8, getSymbolName(name_offset, string_section.data)),
-                .info = utils.readInt(u8, symtab.data, offset + 4, header.data),
-                .other = utils.readInt(u8, symtab.data, offset + 5, header.data),
-                .shndx = STNdx.fromInt(shndx, sections),
-                .value = utils.readInt(u64, symtab.data, offset + 8, header.data),
-                .size = utils.readInt(u64, symtab.data, offset + 16, header.data),
-
-                .allocator = allocator,
-            };
-
-            try symbols.append(symbol);
-        }
-
-        return symbols.toOwnedSlice();
-    }
-
-    pub fn get_bind(self: ElfSymbol) STBind {
-        return @enumFromInt(self.info >> 4);
-    }
-
-    pub fn get_type(self: ElfSymbol) STType {
-        return @enumFromInt(self.info & 0xf);
-    }
-
-    fn getSymbolName(idx: u32, bytes: []const u8) []const u8 {
-        var end_offset = idx;
-
-        while (true) {
-            if (bytes[end_offset] == 0) {
-                break;
-            }
-            end_offset += 1;
-        }
-
-        return bytes[idx..end_offset];
-    }
-
-    pub fn getDisplayName(self: ElfSymbol) []const u8 {
-        if (self.name.len != 0) {
-            return self.name;
-        }
-        if (self.shndx == .section) {
-            return self.shndx.section;
-        }
-        return "";
-    }
-
-    pub fn deinit(self: *const ElfSymbol) void {
-        self.allocator.free(self.name);
-    }
-};
-
-pub const STBind = enum(usize) {
-    STB_LOCAL = 0,
-    STB_GLOBAL = 1,
-    STB_WEAK = 2,
-    STB_LOPROC = 13,
-    STB_HIPROC = 15,
-};
-
-pub const STType = enum(usize) {
-    STT_NOTYPE = 0,
-    STT_OBJECT = 1,
-    STT_FUNC = 2,
-    STT_SECTION = 3,
-    STT_FILE = 4,
-    STT_LOPROC = 13,
-    STT_HIPROC = 15,
-};
-
-pub const STNdx = union(enum(usize)) {
-    SHN_UNDEF = 0,
-    // SHN_LORESERVE = 0xff00,
-    SHN_LOPROC = 0xff00,
-    SHN_HIPROC = 0xff1f,
-    SHN_ABS = 0xfff1,
-    SHN_COMMON = 0xfff2,
-    SHN_HIRESERVE = 0xffff,
-    section: []const u8,
-
-    pub fn fromInt(value: u16, sections: []ElfSection) STNdx {
-        return switch (value) {
-            0 => STNdx.SHN_UNDEF,
-            0xff00 => STNdx.SHN_LOPROC,
-            0xff1f => STNdx.SHN_HIPROC,
-            0xfff1 => STNdx.SHN_ABS,
-            0xfff2 => STNdx.SHN_COMMON,
-            0xffff => STNdx.SHN_HIRESERVE,
-            else => STNdx{ .section = sections[value - 1].name },
+            .allocator = allocator,
         };
+
+        try symbols.append(symbol);
     }
 
-    pub fn toInt(self: STNdx, sections: []ElfSection) u16 {
-        return switch (self) {
-            STNdx.SHN_UNDEF => 0,
-            STNdx.SHN_LOPROC => 0xff00,
-            STNdx.SHN_HIPROC => 0xff1f,
-            STNdx.SHN_ABS => 0xfff1,
-            STNdx.SHN_COMMON => 0xfff2,
-            STNdx.SHN_HIRESERVE => 0xffff,
-            STNdx.section => |value| {
-                for (sections, 0..) |section, i| {
-                    if (std.mem.eql(u8, section.name, value)) {
-                        return @intCast(i);
-                    }
-                }
-                unreachable;
-            },
-        };
+    return symbols.toOwnedSlice();
+}
+
+fn getSymbolName(idx: u32, bytes: []const u8) []const u8 {
+    var end_offset = idx;
+
+    while (true) {
+        if (bytes[end_offset] == 0) {
+            break;
+        }
+        end_offset += 1;
     }
 
-    pub fn toIntFromMap(self: STNdx, section_map: std.StringHashMap(usize)) u16 {
-        return switch (self) {
-            STNdx.SHN_UNDEF => 0,
-            STNdx.SHN_LOPROC => 0xff00,
-            STNdx.SHN_HIPROC => 0xff1f,
-            STNdx.SHN_ABS => 0xfff1,
-            STNdx.SHN_COMMON => 0xfff2,
-            STNdx.SHN_HIRESERVE => 0xffff,
-            STNdx.section => |value| @intCast(section_map.get(value).?),
-        };
-    }
-
-    pub fn isSpecial(self: STNdx) bool {
-        return switch (self) {
-            STNdx.section => false,
-            else => true,
-        };
-    }
-};
+    return bytes[idx..end_offset];
+}

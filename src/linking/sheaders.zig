@@ -1,21 +1,21 @@
 const std = @import("std");
 
-const parser = @import("parser");
+const elf = @import("elf");
 
 pub fn buildSHeaders(
     allocator: std.mem.Allocator,
-    sections: []const parser.ElfSection,
+    sections: []const elf.Section,
     shstrtab_names: std.StringHashMap(u32),
-) ![]parser.ElfSectionHeader {
-    var sheaders = std.ArrayList(parser.ElfSectionHeader).init(allocator);
+) ![]elf.SectionHeader {
+    var sheaders = std.ArrayList(elf.SectionHeader).init(allocator);
     defer sheaders.deinit();
 
-    try sheaders.append(std.mem.zeroes(parser.ElfSectionHeader));
+    try sheaders.append(std.mem.zeroes(elf.SectionHeader));
 
     var offset: usize = 64;
 
     for (sections) |section| {
-        const header = parser.ElfSectionHeader{
+        const header = elf.SectionHeader{
             // TODO: set name
             .name = shstrtab_names.get(section.name) orelse 0,
             .type = section.type,

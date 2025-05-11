@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const ElfLinker = @import("linker.zig").ElfLinker;
-const ElfSection = @import("parser").ElfSection;
+const elf = @import("elf");
 
 pub fn buildShstrtab(linker: *ElfLinker) !std.StringHashMap(u32) {
     var data = std.ArrayList(u8).init(linker.allocator);
@@ -26,7 +26,7 @@ pub fn buildShstrtab(linker: *ElfLinker) !std.StringHashMap(u32) {
     try names.put(".shstrtab", @intCast(data.items.len));
     try data.appendSlice(".shstrtab\x00");
 
-    const shstrtab = ElfSection{
+    const shstrtab = elf.Section{
         .name = ".shstrtab",
         .type = .SHT_STRTAB,
         .flags = 0,

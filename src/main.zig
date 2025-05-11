@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const elf = @import("elf");
 const parser = @import("parser");
 const linker = @import("linker").ElfLinker;
 const writer = @import("writer");
@@ -19,7 +20,7 @@ pub fn main() !void {
     };
     defer args.deinit();
 
-    var elfFiles = std.ArrayList(parser.Elf64).init(allocator);
+    var elfFiles = std.ArrayList(elf.Elf64).init(allocator);
     defer {
         for (elfFiles.items) |elfObj| {
             elfObj.deinit();
@@ -34,7 +35,7 @@ pub fn main() !void {
         };
         defer file.close();
 
-        const elfObj = try parser.Elf64.new(allocator, file);
+        const elfObj = try parser.new(allocator, file);
         try elfFiles.append(elfObj);
     }
 

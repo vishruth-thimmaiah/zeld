@@ -1,15 +1,15 @@
 const std = @import("std");
 
 const ElfLinker = @import("linker.zig").ElfLinker;
-const parser = @import("parser");
-const ElfSection = parser.ElfSection;
-const ElfRelocation = parser.ElfRelocations;
+const elf = @import("elf");
+const Section = elf.Section;
+const Relocation = elf.Relocation;
 
 pub fn addRelocationSections(self: *ElfLinker) !void {
     const sections = &self.mutElf.sections.items;
     const len = sections.len - 1;
 
-    var rela_indexes = std.ArrayList(struct { ElfSection, usize }).init(self.allocator);
+    var rela_indexes = std.ArrayList(struct { Section, usize }).init(self.allocator);
     defer rela_indexes.deinit();
 
     var rela_count: u32 = 0;
@@ -39,11 +39,11 @@ pub fn addRelocationSections(self: *ElfLinker) !void {
 
 fn buildRelocationSection(
     allocator: std.mem.Allocator,
-    relocations: []const ElfRelocation,
+    relocations: []const Relocation,
     name: []const u8,
     sh_size: usize,
     sh_info: usize,
-) !ElfSection {
+) !Section {
     var data = try std.ArrayList(u8).initCapacity(allocator, relocations.len * 24);
     defer data.deinit();
 
@@ -62,7 +62,7 @@ fn buildRelocationSection(
 
     const rela_name = try std.fmt.allocPrint(allocator, ".rela{s}", .{name});
 
-    return ElfSection{
+    return Section{
         .name = rela_name,
         .data = try data.toOwnedSlice(),
         .type = .SHT_RELA,

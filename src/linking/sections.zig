@@ -1,9 +1,9 @@
 const std = @import("std");
-const parser = @import("parser");
+const elf = @import("elf");
 const ElfLinker = @import("linker.zig").ElfLinker;
 const helpers = @import("helpers.zig");
 
-pub fn mergeSections(linker: *ElfLinker, file: parser.Elf64) !std.StringHashMap(usize) {
+pub fn mergeSections(linker: *ElfLinker, file: elf.Elf64) !std.StringHashMap(usize) {
     var section_map = std.StringHashMap(usize).init(linker.allocator);
 
     for (linker.mutElf.sections.items, 0..) |*section, i| {
@@ -37,10 +37,10 @@ fn mergeData(linker: *const ElfLinker, main: []const u8, other: []const u8, alig
 
 fn mergeRelas(
     linker: *const ElfLinker,
-    main: ?[]parser.ElfRelocations,
-    other: ?[]parser.ElfRelocations,
+    main: ?[]elf.Relocation,
+    other: ?[]elf.Relocation,
     alignment: u64,
-) !?[]parser.ElfRelocations {
+) !?[]elf.Relocation {
     if (main == null and other == null) return null;
 
     if (other) |_| {
@@ -49,11 +49,11 @@ fn mergeRelas(
         }
     }
 
-    if (main == null or other == null) return main orelse try linker.allocator.dupe(parser.ElfRelocations, other.?);
+    if (main == null or other == null) return main orelse try linker.allocator.dupe(elf.Relocation, other.?);
 
     defer linker.allocator.free(main.?);
 
     const relas = &.{ main.?, other.? };
-    const concated_relas = try std.mem.concat(linker.allocator, parser.ElfRelocations, relas);
+    const concated_relas = try std.mem.concat(linker.allocator, elf.Relocation, relas);
     return concated_relas;
 }

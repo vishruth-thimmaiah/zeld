@@ -1,7 +1,7 @@
 const std = @import("std");
-const parser = @import("parser");
+const elf = @import("elf");
 
-pub fn writeSHeader(allocator: std.mem.Allocator, sheaders: []parser.ElfSectionHeader) ![]u8 {
+pub fn writeSHeader(allocator: std.mem.Allocator, sheaders: []elf.SectionHeader) ![]u8 {
     var bytes = try std.ArrayList(u8).initCapacity(allocator, sheaders.len);
 
     for (sheaders) |sheader| {

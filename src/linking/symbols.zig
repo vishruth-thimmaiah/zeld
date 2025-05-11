@@ -1,9 +1,9 @@
 const std = @import("std");
-const parser = @import("parser");
+const elf = @import("elf");
 const ElfLinker = @import("linker.zig").ElfLinker;
 const helpers = @import("helpers.zig");
 
-pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, section_map: std.StringHashMap(usize)) !void {
+pub fn mergeSymbols(linker: *ElfLinker, file: elf.Elf64, section_map: std.StringHashMap(usize)) !void {
     var symbol_map = std.StringHashMap(usize).init(linker.allocator);
     defer symbol_map.deinit();
 
@@ -62,7 +62,7 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, section_map: std.Str
     for (linker.mutElf.sections.items) |*section| {
         if (section.relocations) |relocations| {
             const rela_len = relocations.len;
-            var other_relas: ?[]parser.ElfRelocations = undefined;
+            var other_relas: ?[]elf.Relocation = undefined;
             for (file.sections) |other_section| {
                 if (std.mem.eql(u8, other_section.name, section.name)) {
                     other_relas = other_section.relocations;
@@ -96,7 +96,7 @@ pub fn mergeSymbols(linker: *ElfLinker, file: parser.Elf64, section_map: std.Str
     }
 }
 
-fn get_section_of_symbol(symbol: parser.ElfSymbol, file: parser.Elf64, section_map: std.StringHashMap(usize)) u16 {
+fn get_section_of_symbol(symbol: elf.Symbol, file: elf.Elf64, section_map: std.StringHashMap(usize)) u16 {
     const shndx = symbol.shndx;
     const section = file.sections[shndx - 1];
 
@@ -118,7 +118,7 @@ pub fn addSymbolSections(self: *ElfLinker) !void {
     );
     try self.mutElf.sections.append(section);
 
-    const strtab = parser.ElfSection{
+    const strtab = elf.Section{
         .name = ".strtab",
         .type = .SHT_STRTAB,
         .flags = 0,
@@ -137,11 +137,11 @@ pub fn addSymbolSections(self: *ElfLinker) !void {
 
 fn buildSymbolSection(
     allocator: std.mem.Allocator,
-    symbols: []const parser.ElfSymbol,
+    symbols: []const elf.Symbol,
     names: *std.ArrayList(u8),
-    sections: []const parser.ElfSection,
+    sections: []const elf.Section,
     symbols_index: usize,
-) !parser.ElfSection {
+) !elf.Section {
     var data = std.ArrayList(u8).init(allocator);
     defer data.deinit();
     try names.append(0);
@@ -189,7 +189,7 @@ fn buildSymbolSection(
         try data.appendSlice(&size);
     }
 
-    return parser.ElfSection{
+    return elf.Section{
         .name = ".symtab",
         .data = try data.toOwnedSlice(),
         .type = .SHT_SYMTAB,

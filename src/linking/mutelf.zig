@@ -1,28 +1,28 @@
 const std = @import("std");
 
-const parser = @import("parser");
-const ElfHeader = parser.ElfHeader;
-const ElfSectionHeader = parser.ElfSectionHeader;
-const ElfSection = parser.ElfSection;
-const ElfSymbol = parser.ElfSymbol;
+const elf = @import("elf");
+const Header = elf.Header;
+const SectionHeader = elf.SectionHeader;
+const Section = elf.Section;
+const Symbol = elf.Symbol;
 const buildSHeaders = @import("sheaders.zig").buildSHeaders;
 
 pub const MutElf64 = struct {
-    header: ElfHeader,
-    symbols: std.ArrayList(ElfSymbol),
-    sections: std.ArrayList(ElfSection),
+    header: Header,
+    symbols: std.ArrayList(Symbol),
+    sections: std.ArrayList(Section),
 
     allocator: std.mem.Allocator,
 
-    pub fn new(allocator: std.mem.Allocator, file: parser.Elf64) !MutElf64 {
-        var mutSymbols = std.ArrayList(ElfSymbol).init(allocator);
+    pub fn new(allocator: std.mem.Allocator, file: elf.Elf64) !MutElf64 {
+        var mutSymbols = std.ArrayList(Symbol).init(allocator);
         try mutSymbols.appendSlice(file.symbols);
-        var mutSections = std.ArrayList(ElfSection).init(allocator);
+        var mutSections = std.ArrayList(Section).init(allocator);
         for (file.sections, 0..) |symbol, idx| {
             try mutSections.append(symbol);
             mutSections.items[idx].data = try allocator.dupe(u8, symbol.data);
             if (symbol.relocations) |relocations| {
-                mutSections.items[idx].relocations = try allocator.dupe(parser.ElfRelocations, relocations);
+                mutSections.items[idx].relocations = try allocator.dupe(elf.Relocation, relocations);
             }
         }
 
@@ -35,8 +35,8 @@ pub const MutElf64 = struct {
         };
     }
 
-    pub fn toElf64(self: *MutElf64, shstrtab_names: std.StringHashMap(u32)) !parser.Elf64 {
-        return parser.Elf64{
+    pub fn toElf64(self: *MutElf64, shstrtab_names: std.StringHashMap(u32)) !elf.Elf64 {
+        return elf.Elf64{
             .header = self.header,
             .sheaders = try buildSHeaders(self.allocator, self.sections.items, shstrtab_names),
             .symbols = try self.symbols.toOwnedSlice(),

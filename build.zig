@@ -15,25 +15,32 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    const elf = b.addModule("elf", .{
+        .target = target,
+        .optimize = optimize,
+        .root_source_file = .{ .cwd_relative = "src/elf/elf.zig" },
+    });
+
     const parser = b.addModule("parser", .{
         .target = target,
         .optimize = optimize,
         .root_source_file = .{ .cwd_relative = "src/parser/elf.zig" },
     });
+    parser.addImport("elf", elf);
 
     const linker = b.addModule("linker", .{
         .target = target,
         .optimize = optimize,
         .root_source_file = .{ .cwd_relative = "src/linking/linker.zig" },
     });
-    linker.addImport("parser", parser);
+    linker.addImport("elf", elf);
 
     const writer = b.addModule("writer", .{
         .target = target,
         .optimize = optimize,
         .root_source_file = .{ .cwd_relative = "src/writer/writer.zig" },
     });
-    writer.addImport("parser", parser);
+    writer.addImport("elf", elf);
 
     const exe = b.addExecutable(.{
         .name = "zeld",
@@ -44,6 +51,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("parser", parser);
     exe.root_module.addImport("linker", linker);
     exe.root_module.addImport("writer", writer);
+    exe.root_module.addImport("elf", elf);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -82,6 +90,7 @@ pub fn build(b: *std.Build) void {
     exe_unit_tests.root_module.addImport("parser", parser);
     exe_unit_tests.root_module.addImport("linker", linker);
     exe_unit_tests.root_module.addImport("writer", writer);
+    exe_unit_tests.root_module.addImport("elf", elf);
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 

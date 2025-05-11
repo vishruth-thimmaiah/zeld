@@ -1,4 +1,5 @@
 const std = @import("std");
+const elf = @import("elf");
 const parser = @import("parser");
 const linker = @import("linker").ElfLinker;
 const writer = @import("writer");
@@ -62,9 +63,9 @@ pub fn build(input_1: []const u8, input_2: []const u8) !u8 {
     const file2 = try std.fs.cwd().openFile("zig-out/tests/file2.o", .{});
     defer file2.close();
 
-    const elfFiles = [2]parser.Elf64{
-        try parser.Elf64.new(allocator, file1),
-        try parser.Elf64.new(allocator, file2),
+    const elfFiles = [2]elf.Elf64{
+        try parser.new(allocator, file1),
+        try parser.new(allocator, file2),
     };
 
     defer {
