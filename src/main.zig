@@ -2,7 +2,7 @@ const std = @import("std");
 
 const elf = @import("elf");
 const parser = @import("parser");
-const linker = @import("linker").ElfLinker;
+const ElfLinker = @import("linker").ElfLinker;
 const writer = @import("writer");
 const Args = @import("args.zig").Args;
 
@@ -20,28 +20,25 @@ pub fn main() !void {
     };
     defer args.deinit();
 
-    var elfFiles = std.ArrayList(elf.Elf64).init(allocator);
+    const start_file = try parser.new(allocator, &args.inputs[0]);
+    defer start_file.deinit();
+    var linker = try ElfLinker.new(allocator, &start_file);
+    defer linker.deinit();
+
+    // TODO: Free the memory of the elfObjects immediately after each merge
+    var elfObjects = try allocator.alloc(elf.Elf64, args.inputs.len - 1);
+    defer allocator.free(elfObjects);
     defer {
-        for (elfFiles.items) |elfObj| {
-            elfObj.deinit();
-        }
-        elfFiles.deinit();
+        for (elfObjects) |obj| obj.deinit();
     }
 
-    for (args.inputs) |arg| {
-        const file = std.fs.cwd().openFile(arg, .{}) catch |err| {
-            std.debug.print("Error {s}: Failed to open '{s}'\n", .{ @errorName(err), arg });
-            std.process.exit(1);
-        };
-        defer file.close();
-
-        const elfObj = try parser.new(allocator, file);
-        try elfFiles.append(elfObj);
+    for (args.inputs[1..], 0..) |*path, i| {
+        const elfObj = try parser.new(allocator, path);
+        elfObjects[i] = elfObj;
+        try linker.merge(&elfObj);
     }
 
-    var elfLinker = try linker.new(allocator, elfFiles.items);
-    defer elfLinker.deinit();
-    try elfLinker.link();
+    try linker.link();
 
-    try writer.writer(elfLinker.out, args.output);
+    try writer.writer(linker.out, args.output);
 }

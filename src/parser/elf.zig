@@ -8,7 +8,13 @@ const symbolNew = @import("symbols.zig").parse;
 
 const elf = @import("elf");
 
-pub fn new(allocator: std.mem.Allocator, file: std.fs.File) !elf.Elf64 {
+pub fn new(allocator: std.mem.Allocator, path: *[]const u8) !elf.Elf64 {
+    const file = std.fs.cwd().openFile(path.*, .{}) catch |err| {
+        std.debug.print("Error {s}: Failed to open '{s}'\n", .{ @errorName(err), path });
+        std.process.exit(1);
+    };
+    defer file.close();
+
     const stat = try file.stat();
     const filebuffer = try file.readToEndAlloc(allocator, stat.size);
     defer allocator.free(filebuffer);

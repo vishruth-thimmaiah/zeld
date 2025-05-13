@@ -8,18 +8,16 @@ const newSymbolMerger = @import("symbols.zig");
 const MutElf64 = @import("mutelf.zig").MutElf64;
 
 pub const ElfLinker = struct {
-    files: []const elf.Elf64,
     out: elf.Elf64,
     mutElf: MutElf64,
 
     allocator: std.mem.Allocator,
 
-    pub fn new(allocator: std.mem.Allocator, files: []const elf.Elf64) !ElfLinker {
-        const mutElf = try MutElf64.new(allocator, files[0]);
+    pub fn new(allocator: std.mem.Allocator, file: *const elf.Elf64) !ElfLinker {
+        const mutElf = try MutElf64.new(allocator, file);
         errdefer mutElf.deinit();
 
         return ElfLinker{
-            .files = files[1..],
             .out = undefined,
             .mutElf = mutElf,
 
@@ -27,14 +25,15 @@ pub const ElfLinker = struct {
         };
     }
 
-    pub fn link(self: *ElfLinker) !void {
+    pub fn merge(self: *ElfLinker, file: *const elf.Elf64) !void {
         errdefer self.mutElf.deinit();
-        for (self.files) |file| {
-            self.verify(file);
-            var section_map = try newSectionMerger.mergeSections(self, file);
-            defer section_map.deinit();
-            try newSymbolMerger.mergeSymbols(self, file, section_map);
-        }
+        self.verify(file);
+        var section_map = try newSectionMerger.mergeSections(self, file);
+        defer section_map.deinit();
+        try newSymbolMerger.mergeSymbols(self, file, section_map);
+    }
+
+    pub fn link(self: *ElfLinker) !void {
         try relocations.addRelocationSections(self);
         try newSymbolMerger.addSymbolSections(self);
         var shstrtab_names = try shstrtab.buildShstrtab(self);
@@ -43,7 +42,7 @@ pub const ElfLinker = struct {
         self.out = try self.mutElf.toElf64(shstrtab_names);
     }
 
-    fn verify(self: *ElfLinker, file: elf.Elf64) void {
+    fn verify(self: *ElfLinker, file: *const elf.Elf64) void {
         if (self.mutElf.header.type != 1 or file.header.type != 1) {
             std.debug.panic("File type is not yet supported", .{});
         }

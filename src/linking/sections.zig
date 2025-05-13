@@ -3,7 +3,7 @@ const elf = @import("elf");
 const ElfLinker = @import("linker.zig").ElfLinker;
 const helpers = @import("helpers.zig");
 
-pub fn mergeSections(linker: *ElfLinker, file: elf.Elf64) !std.StringHashMap(usize) {
+pub fn mergeSections(linker: *ElfLinker, file: *const elf.Elf64) !std.StringHashMap(usize) {
     var section_map = std.StringHashMap(usize).init(linker.allocator);
 
     for (linker.mutElf.sections.items, 0..) |*section, i| {

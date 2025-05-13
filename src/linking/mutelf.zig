@@ -14,7 +14,7 @@ pub const MutElf64 = struct {
 
     allocator: std.mem.Allocator,
 
-    pub fn new(allocator: std.mem.Allocator, file: elf.Elf64) !MutElf64 {
+    pub fn new(allocator: std.mem.Allocator, file: *const elf.Elf64) !MutElf64 {
         var mutSymbols = std.ArrayList(Symbol).init(allocator);
         try mutSymbols.appendSlice(file.symbols);
         var mutSections = std.ArrayList(Section).init(allocator);

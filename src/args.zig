@@ -31,7 +31,7 @@ pub const Args = struct {
             }
         }
 
-        if (inputs.items.len < 2) {
+        if (inputs.items.len == 0) {
             return error.MissingInput;
         }
 

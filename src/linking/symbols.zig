@@ -3,7 +3,7 @@ const elf = @import("elf");
 const ElfLinker = @import("linker.zig").ElfLinker;
 const helpers = @import("helpers.zig");
 
-pub fn mergeSymbols(linker: *ElfLinker, file: elf.Elf64, section_map: std.StringHashMap(usize)) !void {
+pub fn mergeSymbols(linker: *ElfLinker, file: *const elf.Elf64, section_map: std.StringHashMap(usize)) !void {
     var symbol_map = std.StringHashMap(usize).init(linker.allocator);
     defer symbol_map.deinit();
 

@@ -58,14 +58,12 @@ pub fn build(input_1: []const u8, input_2: []const u8) !u8 {
     try build_bin(allocator, input_1, "zig-out/tests/file1.o");
     try build_bin(allocator, input_2, "zig-out/tests/file2.o");
 
-    const file1 = try std.fs.cwd().openFile("zig-out/tests/file1.o", .{});
-    defer file1.close();
-    const file2 = try std.fs.cwd().openFile("zig-out/tests/file2.o", .{});
-    defer file2.close();
+    var file1: []const u8 = &"zig-out/tests/file1.o".*;
+    var file2: []const u8 = &"zig-out/tests/file2.o".*;
 
     const elfFiles = [2]elf.Elf64{
-        try parser.new(allocator, file1),
-        try parser.new(allocator, file2),
+        try parser.new(allocator, &file1),
+        try parser.new(allocator, &file2),
     };
 
     defer {
@@ -74,8 +72,9 @@ pub fn build(input_1: []const u8, input_2: []const u8) !u8 {
         }
     }
 
-    var elfLinker = try linker.new(allocator, &elfFiles);
+    var elfLinker = try linker.new(allocator, &elfFiles[0]);
     defer elfLinker.deinit();
+    try elfLinker.merge(&elfFiles[1]);
     try elfLinker.link();
 
     try writer.writer(elfLinker.out, "zig-out/tests/file3.o");
