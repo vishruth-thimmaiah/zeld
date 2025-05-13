@@ -4,6 +4,9 @@ pub const MAGIC_BYTES = [4]u8{ 0x7F, 0x45, 0x4C, 0x46 };
 
 pub const Header = @import("header.zig").Header;
 
+pub const ProgramHeader = @import("header.zig").ProgramHeader;
+pub const PHType = @import("header.zig").PHType;
+
 pub const SectionHeader = @import("header.zig").SectionHeader;
 pub const SHType = @import("header.zig").SHType;
 
@@ -18,6 +21,7 @@ pub const STNdx = @import("symbols.zig").STNdx;
 
 pub const Elf64 = struct {
     header: Header,
+    pheaders: ?[]ProgramHeader,
     sheaders: []SectionHeader,
     symbols: []Symbol,
     sections: []Section,
@@ -27,6 +31,7 @@ pub const Elf64 = struct {
     pub fn deinit(self: *const Elf64) void {
         for (self.symbols) |symbol| symbol.deinit();
         for (self.sections) |section| section.deinit();
+        if (self.pheaders) |pheaders| self.allocator.free(pheaders);
         self.allocator.free(self.sheaders);
         self.allocator.free(self.symbols);
         self.allocator.free(self.sections);

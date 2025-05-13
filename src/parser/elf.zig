@@ -67,6 +67,7 @@ pub fn new(allocator: std.mem.Allocator, path: *[]const u8) !elf.Elf64 {
 
     return elf.Elf64{
         .header = fileHeader,
+        .pheaders = null,
         .sheaders = sheaders,
         .symbols = symbols,
         .sections = try sections.toOwnedSlice(),

@@ -49,3 +49,26 @@ pub const SHType = enum(u32) {
     SHT_DYNSYM,
     _,
 };
+
+pub const ProgramHeader = struct {
+    type: PHType,
+    flags: u32,
+    offset: u64,
+    vaddr: u64,
+    paddr: u64,
+    filesz: u64,
+    memsz: u64,
+    align_: u64,
+};
+
+pub const PHType = enum(u32) {
+    PT_NULL = 0,
+    PT_LOAD = 1,
+    PT_DYNAMIC = 2,
+    PT_INTERP = 3,
+    PT_NOTE = 4,
+    PT_SHLIB = 5,
+    PT_PHDR = 6,
+    PT_LOPROC = 0x70000000,
+    PT_HIPROC = 0x7fffffff,
+};

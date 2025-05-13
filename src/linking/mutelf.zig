@@ -9,12 +9,19 @@ const buildSHeaders = @import("sheaders.zig").buildSHeaders;
 
 pub const MutElf64 = struct {
     header: Header,
+    pheaders: ?std.ArrayList(elf.ProgramHeader),
     symbols: std.ArrayList(Symbol),
     sections: std.ArrayList(Section),
 
     allocator: std.mem.Allocator,
 
     pub fn new(allocator: std.mem.Allocator, file: *const elf.Elf64) !MutElf64 {
+        var pheaders: ?std.ArrayList(elf.ProgramHeader) = null;
+        if (file.pheaders) |ph| {
+            pheaders = try std.ArrayList(elf.ProgramHeader).initCapacity(allocator, ph.len);
+            try pheaders.?.appendSlice(ph);
+        }
+
         var mutSymbols = std.ArrayList(Symbol).init(allocator);
         try mutSymbols.appendSlice(file.symbols);
         var mutSections = std.ArrayList(Section).init(allocator);
@@ -28,6 +35,7 @@ pub const MutElf64 = struct {
 
         return MutElf64{
             .header = file.header,
+            .pheaders = pheaders,
             .symbols = mutSymbols,
             .sections = mutSections,
 
@@ -38,6 +46,7 @@ pub const MutElf64 = struct {
     pub fn toElf64(self: *MutElf64, shstrtab_names: std.StringHashMap(u32)) !elf.Elf64 {
         return elf.Elf64{
             .header = self.header,
+            .pheaders = if (self.pheaders) |*pheaders| try pheaders.toOwnedSlice() else null,
             .sheaders = try buildSHeaders(self.allocator, self.sections.items, shstrtab_names),
             .symbols = try self.symbols.toOwnedSlice(),
             .sections = try self.sections.toOwnedSlice(),
