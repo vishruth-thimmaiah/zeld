@@ -77,6 +77,9 @@ pub const ElfLinker = struct {
                 self.allocator.free(rela);
             }
         }
+        if (self.out.pheaders) |pheaders| {
+            self.allocator.free(pheaders);
+        }
         self.allocator.free(self.out.sections);
         self.allocator.free(self.out.symbols);
         self.allocator.free(self.out.sheaders);

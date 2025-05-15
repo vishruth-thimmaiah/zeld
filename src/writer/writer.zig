@@ -10,9 +10,9 @@ pub fn writer(elf_: elf.Elf64, filename: []const u8) !void {
     defer file.close();
 
     var pheaders: ?[]u8 = null;
+    defer elf_.allocator.free(pheaders.?);
     if (elf_.pheaders) |ph| {
         pheaders = try writePHeader(elf_.allocator, ph);
-        defer elf_.allocator.free(pheaders.?);
     }
 
     const sectionHeaders = try writeSHeader(elf_.allocator, elf_.sheaders);

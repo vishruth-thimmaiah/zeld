@@ -59,6 +59,16 @@ pub const ProgramHeader = struct {
     filesz: u64,
     memsz: u64,
     align_: u64,
+
+    pub fn setSize(self: *ProgramHeader, size: u64) void {
+        self.filesz = size;
+        self.memsz = size;
+    }
+
+    pub fn setAddr(self: *ProgramHeader, addr: u64) void {
+        self.vaddr = addr;
+        self.paddr = addr;
+    }
 };
 
 pub const PHType = enum(u32) {
