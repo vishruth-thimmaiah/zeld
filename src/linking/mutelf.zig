@@ -47,7 +47,12 @@ pub const MutElf64 = struct {
         return elf.Elf64{
             .header = self.header,
             .pheaders = if (self.pheaders) |*pheaders| try pheaders.toOwnedSlice() else null,
-            .sheaders = try buildSHeaders(self.allocator, self.sections.items, shstrtab_names),
+            .sheaders = try buildSHeaders(
+                self.allocator,
+                self.sections.items,
+                shstrtab_names,
+                self.header.phnum * self.header.phentsize,
+            ),
             .symbols = try self.symbols.toOwnedSlice(),
             .sections = try self.sections.toOwnedSlice(),
 

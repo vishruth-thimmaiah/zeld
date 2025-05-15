@@ -3,8 +3,9 @@ const elf = @import("elf");
 
 const relocations = @import("relocations.zig");
 const shstrtab = @import("shstrtab.zig");
-const newSectionMerger = @import("sections.zig");
-const newSymbolMerger = @import("symbols.zig");
+const SectionMerger = @import("sections.zig");
+const SymbolMerger = @import("symbols.zig");
+const PheaderGenerator = @import("pheaders.zig");
 const MutElf64 = @import("mutelf.zig").MutElf64;
 
 pub const ElfLinker = struct {
@@ -28,14 +29,15 @@ pub const ElfLinker = struct {
     pub fn merge(self: *ElfLinker, file: *const elf.Elf64) !void {
         errdefer self.mutElf.deinit();
         self.verify(file);
-        var section_map = try newSectionMerger.mergeSections(self, file);
+        var section_map = try SectionMerger.mergeSections(self, file);
         defer section_map.deinit();
-        try newSymbolMerger.mergeSymbols(self, file, section_map);
+        try SymbolMerger.mergeSymbols(self, file, section_map);
     }
 
     pub fn link(self: *ElfLinker) !void {
         try relocations.addRelocationSections(self);
-        try newSymbolMerger.addSymbolSections(self);
+        try SymbolMerger.addSymbolSections(self);
+        try PheaderGenerator.generatePheaders(self);
         var shstrtab_names = try shstrtab.buildShstrtab(self);
         defer shstrtab_names.deinit();
         self.updateHeader();
@@ -49,16 +51,20 @@ pub const ElfLinker = struct {
     }
 
     fn updateHeader(self: *ElfLinker) void {
-        var shoff: u64 = self.mutElf.header.ehsize;
+        const header = &self.mutElf.header;
+        var shoff: u64 = header.ehsize;
         var shnum: u16 = 1;
         for (self.mutElf.sections.items) |*section| {
             shoff += section.data.len;
             shnum += 1;
         }
 
-        self.mutElf.header.shoff = shoff;
-        self.mutElf.header.shnum = shnum;
-        self.mutElf.header.shstrndx = shnum - 1;
+        header.phentsize = 56;
+        header.phnum = if (self.mutElf.pheaders) |ph| @intCast(ph.items.len) else 0;
+        header.phoff = 64;
+        header.shoff = shoff + header.phnum * header.phentsize;
+        header.shnum = shnum;
+        header.shstrndx = shnum - 1;
     }
 
     pub fn deinit(self: *const ElfLinker) void {

@@ -6,13 +6,14 @@ pub fn buildSHeaders(
     allocator: std.mem.Allocator,
     sections: []const elf.Section,
     shstrtab_names: std.StringHashMap(u32),
+    offset_: usize,
 ) ![]elf.SectionHeader {
     var sheaders = std.ArrayList(elf.SectionHeader).init(allocator);
     defer sheaders.deinit();
 
     try sheaders.append(std.mem.zeroes(elf.SectionHeader));
 
-    var offset: usize = 64;
+    var offset: usize = 64 + offset_;
 
     for (sections) |section| {
         const header = elf.SectionHeader{
