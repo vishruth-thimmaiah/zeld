@@ -2,7 +2,6 @@ const std = @import("std");
 const utils = @import("utils.zig");
 const elf = @import("elf");
 
-
 pub fn parse(allocator: std.mem.Allocator, bytes: []const u8, fheader: elf.Header) ![]elf.SectionHeader {
     var offset: usize = fheader.shoff;
     const endian = fheader.data;
@@ -10,7 +9,7 @@ pub fn parse(allocator: std.mem.Allocator, bytes: []const u8, fheader: elf.Heade
     var headers = std.ArrayList(elf.SectionHeader).init(allocator);
     defer headers.deinit();
 
-    for (fheader.shnum) |_| {
+    for (0..fheader.shnum) |_| {
         var link = utils.readInt(u32, bytes, offset + 40, endian);
         if (link != 0) {
             link -= 1;

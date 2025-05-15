@@ -3,10 +3,10 @@ const std = @import("std");
 pub fn readInt(comptime T: type, bytes: []const u8, offset: usize, endian: std.builtin.Endian) T {
     const size = @sizeOf(T);
     switch (@typeInfo(T)) {
-        .Int => {
+        .int => {
             return std.mem.readInt(T, bytes[offset .. offset + size][0..size], endian);
         },
-        .Enum => {
+        .@"enum" => {
             const int_type = std.meta.Int(.unsigned, @bitSizeOf(T));
             const a = std.mem.readInt(int_type, bytes[offset .. offset + size][0..size], endian);
             return @as(T, @enumFromInt(a));
