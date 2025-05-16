@@ -1,8 +1,10 @@
 const std = @import("std");
+const linker = @import("linker");
 
 pub const Args = struct {
     inputs: [][]const u8,
     output: []const u8,
+    linker_args: linker.LinkerArgs,
 
     allocator: std.mem.Allocator,
 
@@ -13,9 +15,15 @@ pub const Args = struct {
         var inputs = std.ArrayList([]const u8).init(allocator);
         defer inputs.deinit();
 
-        var results: Args = undefined;
-        results.output = "a.out";
-        results.allocator = allocator;
+        var results: Args = .{
+            .inputs = undefined,
+            .output = "a.out",
+            .linker_args = .{
+                .output_type = .ET_EXEC,
+            },
+
+            .allocator = allocator,
+        };
 
         _ = args.skip();
 
@@ -26,6 +34,8 @@ pub const Args = struct {
                     continue;
                 }
                 return error.MissingOutput;
+            } else if (streql(next, "-r", "--relocatable")) {
+                results.linker_args.output_type = .ET_REL;
             } else {
                 try inputs.append(next);
             }

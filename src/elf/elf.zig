@@ -4,6 +4,7 @@ pub const MAGIC_BYTES = [4]u8{ 0x7F, 0x45, 0x4C, 0x46 };
 pub const START_ADDR = 0x400000;
 
 pub const Header = @import("header.zig").Header;
+pub const EType = @import("header.zig").EType;
 
 pub const ProgramHeader = @import("header.zig").ProgramHeader;
 pub const PHType = @import("header.zig").PHType;

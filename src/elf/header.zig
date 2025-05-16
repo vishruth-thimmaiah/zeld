@@ -6,7 +6,7 @@ pub const Header = struct {
     version: u8,
     osabi: u8,
     abiversion: u8,
-    type: u16,
+    type: EType,
     machine: u16,
     file_version: u32,
     entry: u64,
@@ -19,6 +19,18 @@ pub const Header = struct {
     shentsize: u16,
     shnum: u16,
     shstrndx: u16,
+};
+
+pub const EType = enum(u16) {
+    ET_NONE = 0,
+    ET_REL = 1,
+    ET_EXEC = 2,
+    ET_DYN = 3,
+    ET_CORE = 4,
+    ET_LOOS = 0xfe00,
+    ET_HIOS = 0xfeff,
+    ET_LOPROC = 0xff00,
+    ET_HIPROC = 0xffff,
 };
 
 pub const SectionHeader = struct {

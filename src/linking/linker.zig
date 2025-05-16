@@ -8,19 +8,25 @@ const SymbolMerger = @import("symbols.zig");
 const PheaderGenerator = @import("pheaders.zig");
 const MutElf64 = @import("mutelf.zig").MutElf64;
 
+pub const LinkerArgs = struct {
+    output_type: elf.EType,
+};
+
 pub const ElfLinker = struct {
     out: elf.Elf64,
     mutElf: MutElf64,
+    args: LinkerArgs,
 
     allocator: std.mem.Allocator,
 
-    pub fn new(allocator: std.mem.Allocator, file: *const elf.Elf64) !ElfLinker {
+    pub fn new(allocator: std.mem.Allocator, file: *const elf.Elf64, args: LinkerArgs) !ElfLinker {
         const mutElf = try MutElf64.new(allocator, file);
         errdefer mutElf.deinit();
 
         return ElfLinker{
             .out = undefined,
             .mutElf = mutElf,
+            .args = args,
 
             .allocator = allocator,
         };
@@ -37,7 +43,9 @@ pub const ElfLinker = struct {
     pub fn link(self: *ElfLinker) !void {
         try relocations.addRelocationSections(self);
         try SymbolMerger.addSymbolSections(self);
-        try PheaderGenerator.generatePheaders(self);
+        if (self.args.output_type == .ET_EXEC) {
+            try PheaderGenerator.generatePheaders(self);
+        }
         var shstrtab_names = try shstrtab.buildShstrtab(self);
         defer shstrtab_names.deinit();
         self.updateHeader();
@@ -45,7 +53,7 @@ pub const ElfLinker = struct {
     }
 
     fn verify(self: *ElfLinker, file: *const elf.Elf64) void {
-        if (self.mutElf.header.type != 1 or file.header.type != 1) {
+        if (self.mutElf.header.type != .ET_REL or file.header.type != .ET_REL) {
             std.debug.panic("File type is not yet supported", .{});
         }
     }
@@ -58,10 +66,12 @@ pub const ElfLinker = struct {
             shoff += section.data.len;
             shnum += 1;
         }
-
-        header.phentsize = 56;
-        header.phnum = if (self.mutElf.pheaders) |ph| @intCast(ph.items.len) else 0;
-        header.phoff = 64;
+        self.mutElf.header.type = self.args.output_type;
+        if (self.mutElf.header.type == .ET_EXEC) {
+            header.phentsize = 56;
+            header.phnum = if (self.mutElf.pheaders) |ph| @intCast(ph.items.len) else 0;
+            header.phoff = 64;
+        }
         header.shoff = shoff + header.phnum * header.phentsize;
         header.shnum = shnum;
         header.shstrndx = shnum - 1;

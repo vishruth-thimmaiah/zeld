@@ -22,7 +22,7 @@ pub fn main() !void {
 
     const start_file = try parser.new(allocator, &args.inputs[0]);
     defer start_file.deinit();
-    var linker = try ElfLinker.new(allocator, &start_file);
+    var linker = try ElfLinker.new(allocator, &start_file, args.linker_args);
     defer linker.deinit();
 
     // TODO: Free the memory of the elfObjects immediately after each merge

@@ -10,7 +10,7 @@ pub fn writer(elf_: elf.Elf64, filename: []const u8) !void {
     defer file.close();
 
     var pheaders: ?[]u8 = null;
-    defer elf_.allocator.free(pheaders.?);
+    defer if (pheaders) |ph| elf_.allocator.free(ph);
     if (elf_.pheaders) |ph| {
         pheaders = try writePHeader(elf_.allocator, ph);
     }

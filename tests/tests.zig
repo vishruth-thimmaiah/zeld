@@ -72,7 +72,7 @@ pub fn build(input_1: []const u8, input_2: []const u8) !u8 {
         }
     }
 
-    var elfLinker = try linker.new(allocator, &elfFiles[0]);
+    var elfLinker = try linker.new(allocator, &elfFiles[0], .{ .output_type = .ET_REL });
     defer elfLinker.deinit();
     try elfLinker.merge(&elfFiles[1]);
     try elfLinker.link();
