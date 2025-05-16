@@ -5,12 +5,13 @@ const linker = @import("linker").ElfLinker;
 const writer = @import("writer");
 
 comptime {
-    _ = @import("basic.zig");
+    _ = @import("asm_exec.zig");
+    _ = @import("c_rela.zig");
 }
 
-fn build_bin(allocator: std.mem.Allocator, file: []const u8, output: []const u8) !void {
+fn build_object(allocator: std.mem.Allocator, file: []const u8, output: []const u8, lang: []const u8) !void {
     var command = std.process.Child.init(
-        &[_][]const u8{ "gcc", "-o", output, "-xc", "-c", "-" },
+        &[_][]const u8{ "gcc", "-o", output, lang, "-c", "-" },
         allocator,
     );
 
@@ -29,7 +30,7 @@ fn build_bin(allocator: std.mem.Allocator, file: []const u8, output: []const u8)
     }
 }
 
-fn build_output(allocator: std.mem.Allocator, output: []const u8) !u8 {
+fn build_output_for_rela(allocator: std.mem.Allocator, output: []const u8) !u8 {
     var build_command = std.process.Child.init(
         &[_][]const u8{ "gcc", "zig-out/tests/file3.o", "-o", output },
         allocator,
@@ -50,13 +51,13 @@ fn build_output(allocator: std.mem.Allocator, output: []const u8) !u8 {
     return result.Exited;
 }
 
-pub fn build(input_1: []const u8, input_2: []const u8) !u8 {
+pub fn build_rela(input_1: []const u8, input_2: []const u8) !u8 {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    try build_bin(allocator, input_1, "zig-out/tests/file1.o");
-    try build_bin(allocator, input_2, "zig-out/tests/file2.o");
+    try build_object(allocator, input_1, "zig-out/tests/file1.o", "-xc");
+    try build_object(allocator, input_2, "zig-out/tests/file2.o", "-xc");
 
     var file1: []const u8 = &"zig-out/tests/file1.o".*;
     var file2: []const u8 = &"zig-out/tests/file2.o".*;
@@ -79,7 +80,36 @@ pub fn build(input_1: []const u8, input_2: []const u8) !u8 {
 
     try writer.writer(&elfLinker.out, "zig-out/tests/file3.o");
 
-    const result = try build_output(allocator, "zig-out/tests/file4.out");
+    const result = try build_output_for_rela(allocator, "zig-out/tests/file4.out");
 
     return result;
+}
+
+pub fn build_exec(input: []const u8) !u8 {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    try build_object(allocator, input, "zig-out/tests/file1.o", "-xassembler");
+
+    var file: []const u8 = &"zig-out/tests/file1.o".*;
+    const elfFile = try parser.new(allocator, &file);
+    defer elfFile.deinit();
+
+    var elfLinker = try linker.new(allocator, &elfFile, .{ .output_type = .ET_EXEC });
+    defer elfLinker.deinit();
+    try elfLinker.link();
+
+    try writer.writer(&elfLinker.out, "zig-out/tests/file2.out");
+
+    var run_command = std.process.Child.init(
+        &[_][]const u8{"zig-out/tests/file2.out"},
+        allocator,
+    );
+
+    run_command.stdout_behavior = .Ignore;
+
+    try run_command.spawn();
+    const result = try run_command.wait();
+    return result.Exited;
 }
