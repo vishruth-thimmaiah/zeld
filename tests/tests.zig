@@ -77,7 +77,7 @@ pub fn build(input_1: []const u8, input_2: []const u8) !u8 {
     try elfLinker.merge(&elfFiles[1]);
     try elfLinker.link();
 
-    try writer.writer(elfLinker.out, "zig-out/tests/file3.o");
+    try writer.writer(&elfLinker.out, "zig-out/tests/file3.o");
 
     const result = try build_output(allocator, "zig-out/tests/file4.out");
 

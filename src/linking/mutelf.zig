@@ -44,15 +44,16 @@ pub const MutElf64 = struct {
     }
 
     pub fn toElf64(self: *MutElf64, shstrtab_names: std.StringHashMap(u32)) !elf.Elf64 {
+        const sheaders = try buildSHeaders(
+            self.allocator,
+            self.sections.items,
+            shstrtab_names,
+            &self.header,
+        );
         return elf.Elf64{
             .header = self.header,
             .pheaders = if (self.pheaders) |*pheaders| try pheaders.toOwnedSlice() else null,
-            .sheaders = try buildSHeaders(
-                self.allocator,
-                self.sections.items,
-                shstrtab_names,
-                self.header.phnum * self.header.phentsize,
-            ),
+            .sheaders = sheaders,
             .symbols = try self.symbols.toOwnedSlice(),
             .sections = try self.sections.toOwnedSlice(),
 

@@ -40,5 +40,5 @@ pub fn main() !void {
 
     try linker.link();
 
-    try writer.writer(linker.out, args.output);
+    try writer.writer(&linker.out, args.output);
 }
