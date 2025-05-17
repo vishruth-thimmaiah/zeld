@@ -1,7 +1,6 @@
 const std = @import("std");
 const elf = @import("elf");
 const ElfLinker = @import("linker.zig").ElfLinker;
-const helpers = @import("helpers.zig");
 
 pub fn mergeSections(linker: *ElfLinker, file: *const elf.Elf64) !std.StringHashMap(usize) {
     var section_map = std.StringHashMap(usize).init(linker.allocator);
@@ -15,7 +14,7 @@ pub fn mergeSections(linker: *ElfLinker, file: *const elf.Elf64) !std.StringHash
     | {
         if (section_map.get(section.name)) |index| {
             const original_section = &linker.mutElf.sections.items[index];
-            const alignment = helpers.getAlignment(original_section.data.len, original_section.addralign);
+            const alignment = elf.helpers.getAlignment(original_section.data.len, original_section.addralign);
             original_section.data = try mergeData(linker, original_section.data, section.data, alignment);
             original_section.relocations = try mergeRelas(linker, original_section.relocations, section.relocations, alignment);
         } else {
