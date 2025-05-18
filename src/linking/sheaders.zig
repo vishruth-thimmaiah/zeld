@@ -1,15 +1,17 @@
 const std = @import("std");
 
 const elf = @import("elf");
+const ElfLinker = @import("linker.zig").ElfLinker;
 
 pub fn buildSHeaders(
-    allocator: std.mem.Allocator,
-    sections: []const elf.Section,
+    linker: *ElfLinker,
     shstrtab_names: std.StringHashMap(u32),
-    header: *elf.Header,
 ) ![]elf.SectionHeader {
-    var sheaders = std.ArrayList(elf.SectionHeader).init(allocator);
+    var sheaders = std.ArrayList(elf.SectionHeader).init(linker.allocator);
     defer sheaders.deinit();
+
+    const header = &linker.mutElf.header;
+    const sections = linker.mutElf.sections.items;
 
     try sheaders.append(std.mem.zeroes(elf.SectionHeader));
 
@@ -19,7 +21,7 @@ pub fn buildSHeaders(
         const sheader = elf.SectionHeader{
             .name = shstrtab_names.get(section.name) orelse 0,
             .type = section.type,
-            .addr = if (section.flags & 0b010 != 0) elf.START_ADDR | offset else 0,
+            .addr = section.addr,
             .size = section.data.len,
             .link = section.link,
             .info = section.info,
@@ -28,9 +30,6 @@ pub fn buildSHeaders(
             .addralign = section.addralign,
             .entsize = section.entsize,
         };
-        if (std.mem.eql(u8, section.name, ".text")) {
-            header.entry = sheader.addr;
-        }
         try sheaders.append(sheader);
         offset += section.data.len;
     }

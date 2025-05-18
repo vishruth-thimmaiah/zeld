@@ -204,3 +204,19 @@ fn buildSymbolSection(
         .allocator = allocator,
     };
 }
+
+pub fn updateMemValues(linker: *ElfLinker) !void {
+    const symbols = linker.mutElf.symbols.items;
+    const sections = linker.mutElf.sections.items;
+
+    for (symbols) |*symbol| {
+        if (symbol.shndx == .section) {
+            const section_idx = symbol.shndx.toInt(sections);
+            const section = &sections[section_idx];
+            symbol.value += section.addr;
+        }
+        if (std.mem.eql(u8, symbol.name, "_start")) {
+            linker.mutElf.header.entry = symbol.value;
+        }
+    }
+}

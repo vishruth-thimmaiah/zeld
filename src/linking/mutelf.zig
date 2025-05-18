@@ -5,7 +5,6 @@ const Header = elf.Header;
 const SectionHeader = elf.SectionHeader;
 const Section = elf.Section;
 const Symbol = elf.Symbol;
-const buildSHeaders = @import("sheaders.zig").buildSHeaders;
 
 pub const MutElf64 = struct {
     header: Header,
@@ -43,13 +42,7 @@ pub const MutElf64 = struct {
         };
     }
 
-    pub fn toElf64(self: *MutElf64, shstrtab_names: std.StringHashMap(u32)) !elf.Elf64 {
-        const sheaders = try buildSHeaders(
-            self.allocator,
-            self.sections.items,
-            shstrtab_names,
-            &self.header,
-        );
+    pub fn toElf64(self: *MutElf64, sheaders: []elf.SectionHeader ) !elf.Elf64 {
         return elf.Elf64{
             .header = self.header,
             .pheaders = if (self.pheaders) |*pheaders| try pheaders.toOwnedSlice() else null,

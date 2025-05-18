@@ -6,6 +6,7 @@ const shstrtab = @import("shstrtab.zig");
 const SectionMerger = @import("sections.zig");
 const SymbolMerger = @import("symbols.zig");
 const PheaderGenerator = @import("pheaders.zig");
+const buildSHeaders = @import("sheaders.zig").buildSHeaders;
 const MutElf64 = @import("mutelf.zig").MutElf64;
 
 pub const LinkerArgs = struct {
@@ -44,14 +45,19 @@ pub const ElfLinker = struct {
         if (self.args.output_type == .ET_REL) {
             try relocations.addRelocationSections(self);
         }
-        try SymbolMerger.addSymbolSections(self);
         if (self.args.output_type == .ET_EXEC) {
             try PheaderGenerator.generatePheaders(self);
+            try SectionMerger.setAddr(self);
+            try SymbolMerger.updateMemValues(self);
         }
+        try SymbolMerger.addSymbolSections(self);
         var shstrtab_names = try shstrtab.buildShstrtab(self);
         defer shstrtab_names.deinit();
         self.updateHeader();
-        self.out = try self.mutElf.toElf64(shstrtab_names);
+
+        const sheaders = try buildSHeaders(self, shstrtab_names);
+
+        self.out = try self.mutElf.toElf64(sheaders);
     }
 
     fn verify(self: *ElfLinker, file: *const elf.Elf64) void {
