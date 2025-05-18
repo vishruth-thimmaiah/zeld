@@ -11,12 +11,12 @@ pub fn buildShstrtab(linker: *ElfLinker) !std.StringHashMap(u32) {
     var names = std.StringHashMap(u32).init(linker.allocator);
 
     for (linker.mutElf.sections.items) |section| {
-        if (section.relocations != null) {
+        if (section.relocations != null and linker.args.output_type == .ET_REL) {
             try data.appendSlice(section.name);
             try data.append(0);
             continue;
         }
-        if (section.type == .SHT_RELA) {
+        if (section.type == .SHT_RELA and linker.args.output_type == .ET_REL) {
             try names.put(section.name[5..], @intCast(data.items.len + 5));
         }
         try names.put(section.name, @intCast(data.items.len));

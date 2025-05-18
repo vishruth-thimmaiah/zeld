@@ -17,7 +17,6 @@ pub fn buildSHeaders(
 
     for (sections) |section| {
         const sheader = elf.SectionHeader{
-            // TODO: set name
             .name = shstrtab_names.get(section.name) orelse 0,
             .type = section.type,
             .addr = if (section.flags & 0b010 != 0) elf.START_ADDR | offset else 0,

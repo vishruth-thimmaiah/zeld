@@ -41,7 +41,9 @@ pub const ElfLinker = struct {
     }
 
     pub fn link(self: *ElfLinker) !void {
-        try relocations.addRelocationSections(self);
+        if (self.args.output_type == .ET_REL) {
+            try relocations.addRelocationSections(self);
+        }
         try SymbolMerger.addSymbolSections(self);
         if (self.args.output_type == .ET_EXEC) {
             try PheaderGenerator.generatePheaders(self);
