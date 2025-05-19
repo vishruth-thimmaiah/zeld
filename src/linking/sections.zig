@@ -56,11 +56,3 @@ fn mergeRelas(
     const concated_relas = try std.mem.concat(linker.allocator, elf.Relocation, relas);
     return concated_relas;
 }
-
-pub fn setAddr(linker: *ElfLinker) !void {
-    var offset: u64 = 64 + 56 * linker.mutElf.pheaders.?.items.len;
-    for (linker.mutElf.sections.items) |*section| {
-        section.addr = if (section.flags & 0b010 != 0) elf.START_ADDR | offset else 0;
-        offset += section.data.len;
-    }
-}

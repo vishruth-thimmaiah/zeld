@@ -11,7 +11,7 @@ pub fn generatePheaders(linker: *ElfLinker) !void {
     for (sections) |*section| {
         switch (section.type) {
             .SHT_PROGBITS => {
-                try generateLoad(pheaders, section, addr);
+                try generateLoad(pheaders, section, &addr);
             },
             .SHT_NOTE => {},
             .SHT_NOBITS => {},
@@ -28,6 +28,11 @@ pub fn generatePheaders(linker: *ElfLinker) !void {
     for (pheaders.items[2..]) |*pheader| {
         pheader.setAddr(pheader.vaddr + pheaders.items.len * @sizeOf(elf.ProgramHeader));
         pheader.offset += pheaders.items.len * @sizeOf(elf.ProgramHeader);
+    }
+
+    for (sections) |*section| {
+        if (section.flags & 0b010 == 0) continue;
+        section.addr += pheaders.items.len * @sizeOf(elf.ProgramHeader);
     }
 }
 
@@ -58,18 +63,21 @@ fn generatePHDR(pheaders: *std.ArrayList(elf.ProgramHeader)) !void {
     try pheaders.insert(1, load);
 }
 
-fn generateLoad(pheaders: *std.ArrayList(elf.ProgramHeader), section: *elf.Section, addr: u64) !void {
+fn generateLoad(pheaders: *std.ArrayList(elf.ProgramHeader), section: *elf.Section, offset: *u64) !void {
     if (section.data.len == 0) return;
+    const addr = elf.START_ADDR + offset.*;
     const load = elf.ProgramHeader{
         .type = elf.PHType.PT_LOAD,
         .flags = 0b101,
-        .offset = addr,
-        .vaddr = elf.START_ADDR | addr,
-        .paddr = elf.START_ADDR | addr,
+        .offset = offset.*,
+        .vaddr = addr + 0x1000,
+        .paddr = addr + 0x1000,
         .filesz = section.data.len,
         .memsz = section.data.len,
         .align_ = 0x1000,
     };
+
+    section.addr = load.vaddr;
 
     try pheaders.append(load);
 }

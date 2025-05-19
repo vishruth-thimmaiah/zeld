@@ -47,7 +47,6 @@ pub const ElfLinker = struct {
         }
         if (self.args.output_type == .ET_EXEC) {
             try PheaderGenerator.generatePheaders(self);
-            try SectionMerger.setAddr(self);
             try SymbolMerger.updateMemValues(self);
         }
         try SymbolMerger.addSymbolSections(self);
