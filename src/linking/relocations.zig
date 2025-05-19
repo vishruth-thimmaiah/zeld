@@ -77,3 +77,33 @@ fn buildRelocationSection(
         .allocator = allocator,
     };
 }
+
+pub fn applyRelocations(linker: *ElfLinker) !void {
+    const sections = linker.mutElf.sections.items;
+    const symbols = linker.mutElf.symbols.items;
+
+    for (sections) |*section| {
+        if (section.relocations) |relocations| {
+            for (relocations) |*reloc| {
+                const symbol = symbols[reloc.get_symbol()];
+
+                // TODO: try to do this in place
+                const new_data = try linker.mutElf.allocator.dupe(u8, section.data);
+
+                switch (reloc.get_type()) {
+                    .R_X86_64_32S => {
+                        const value = sum(i32, symbol.value, reloc.addend);
+                        std.mem.writeInt(i32, new_data[reloc.offset..][0..4], value, std.builtin.Endian.little);
+                    },
+                    else => undefined,
+                }
+                linker.allocator.free(section.data);
+                section.data = new_data;
+            }
+        }
+    }
+}
+
+fn sum(comptime T: type, num1: anytype, num2: anytype) T {
+    return @as(T, @intCast(num1)) + @as(T, @intCast(num2));
+}

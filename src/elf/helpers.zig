@@ -57,3 +57,22 @@ pub fn sectionSortOrder(name: []const u8) u8 {
         return 99;
     }
 }
+
+pub fn shToPhFlags(sh_flags: u64) u32 {
+    var ph_flags: u32 = 0;
+
+    // Write
+    if (sh_flags & 0b001 != 0) {
+        ph_flags |= 0b010;
+    }
+    // Allocate
+    if (sh_flags & 0b010 != 0) {
+        ph_flags |= 0b100;
+    }
+    // Execute
+    if (sh_flags & 0b100 != 0) {
+        ph_flags |= 0b001;
+    }
+
+    return ph_flags;
+}
