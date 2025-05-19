@@ -92,7 +92,11 @@ pub fn applyRelocations(linker: *ElfLinker) !void {
 
                 switch (reloc.get_type()) {
                     .R_X86_64_32S => {
-                        const value = sum(i32, symbol.value, reloc.addend);
+                        const value = sum(i32, symbol.value, reloc.addend, 0);
+                        std.mem.writeInt(i32, new_data[reloc.offset..][0..4], value, std.builtin.Endian.little);
+                    },
+                    .R_X86_64_PC32 => {
+                        const value = sum(i32, symbol.value, reloc.addend, section.addr + reloc.offset);
                         std.mem.writeInt(i32, new_data[reloc.offset..][0..4], value, std.builtin.Endian.little);
                     },
                     else => undefined,
@@ -104,6 +108,9 @@ pub fn applyRelocations(linker: *ElfLinker) !void {
     }
 }
 
-fn sum(comptime T: type, num1: anytype, num2: anytype) T {
-    return @as(T, @intCast(num1)) + @as(T, @intCast(num2));
+// S: symbol.value
+// A: reloc.addend
+// P: reloc.offset
+fn sum(comptime T: type, s: anytype, a: anytype, p: anytype) T {
+    return @as(T, @intCast(s)) + @as(T, @intCast(a)) - @as(T, @intCast(p));
 }

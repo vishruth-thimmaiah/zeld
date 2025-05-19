@@ -13,7 +13,7 @@ pub fn generatePheaders(linker: *ElfLinker) !void {
         switch (section.type) {
             .SHT_PROGBITS => try generateLoad(pheaders, section, offset, &addr),
             .SHT_NOTE => try generateNote(pheaders, section, offset, &addr),
-            .SHT_NOBITS => section.addr = addr,
+            .SHT_NOBITS => try generateLoad(pheaders, section, offset, &addr),
 
             .SHT_NULL, .SHT_RELA, .SHT_STRTAB, .SHT_SYMTAB => {},
             // TODO
