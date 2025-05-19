@@ -56,3 +56,13 @@ fn mergeRelas(
     const concated_relas = try std.mem.concat(linker.allocator, elf.Relocation, relas);
     return concated_relas;
 }
+
+pub fn organizeSections(linker: *ElfLinker) !void {
+    std.sort.heap(elf.Section, linker.mutElf.sections.items, {}, lessThan);
+}
+
+fn lessThan(_: void, a: elf.Section, b: elf.Section) bool {
+    const a_order = elf.helpers.sectionSortOrder(a.name);
+    const b_order = elf.helpers.sectionSortOrder(b.name);
+    return a_order < b_order;
+}

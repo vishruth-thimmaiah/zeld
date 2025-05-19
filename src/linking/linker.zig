@@ -42,6 +42,7 @@ pub const ElfLinker = struct {
     }
 
     pub fn link(self: *ElfLinker) !void {
+        try SectionMerger.organizeSections(self);
         if (self.args.output_type == .ET_REL) {
             try relocations.addRelocationSections(self);
         }
