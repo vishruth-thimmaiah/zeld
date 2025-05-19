@@ -107,9 +107,13 @@ pub fn build_exec(input: []const u8) !u8 {
         allocator,
     );
 
-    run_command.stdout_behavior = .Ignore;
+    run_command.stdout_behavior = .Pipe;
 
     try run_command.spawn();
     const result = try run_command.wait();
+    if (result == .Signal) {
+	   	std.log.warn("Failed to run with signal: {d}", .{result.Signal});
+        return error.FailedToRun;
+    }
     return result.Exited;
 }

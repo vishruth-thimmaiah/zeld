@@ -6,20 +6,20 @@ pub fn generatePheaders(linker: *ElfLinker) !void {
     const sections = linker.mutElf.sections.items;
     linker.mutElf.pheaders = std.ArrayList(elf.ProgramHeader).init(linker.allocator);
     const pheaders = &linker.mutElf.pheaders.?;
-    var addr: u64 = 64;
+    var offset: u64 = 64;
+    var addr: u64 = elf.START_ADDR | 64;
 
     for (sections) |*section| {
         switch (section.type) {
-            .SHT_PROGBITS => {
-                try generateLoad(pheaders, section, &addr);
-            },
-            .SHT_NOTE => {},
-            .SHT_NOBITS => {},
+            .SHT_PROGBITS => try generateLoad(pheaders, section, offset, &addr),
+            .SHT_NOTE => try generateNote(pheaders, section, offset, &addr),
+            .SHT_NOBITS => section.addr = addr,
 
             .SHT_NULL, .SHT_RELA, .SHT_STRTAB, .SHT_SYMTAB => {},
             // TODO
             else => unreachable,
         }
+        offset += section.data.len;
         addr += section.data.len;
     }
 
@@ -37,7 +37,7 @@ pub fn generatePheaders(linker: *ElfLinker) !void {
 }
 
 fn generatePHDR(pheaders: *std.ArrayList(elf.ProgramHeader)) !void {
-    const sizeof = (pheaders.items.len + 2) * @sizeOf(elf.ProgramHeader);
+    var sizeof = (pheaders.items.len + 2) * @sizeOf(elf.ProgramHeader);
     const phdr = elf.ProgramHeader{
         .type = elf.PHType.PT_PHDR,
         .flags = 0b100,
@@ -48,10 +48,16 @@ fn generatePHDR(pheaders: *std.ArrayList(elf.ProgramHeader)) !void {
         .memsz = sizeof,
         .align_ = 0x8,
     };
+
+    for (pheaders.items) |*pheader| {
+        if (pheader.type != .PT_NOTE) break;
+        sizeof += pheader.offset + pheader.memsz;
+    }
+
     try pheaders.insert(0, phdr);
 
     const load = elf.ProgramHeader{
-        .type = elf.PHType.PT_LOAD,
+        .type = .PT_LOAD,
         .flags = 0b100,
         .offset = 0,
         .vaddr = elf.START_ADDR,
@@ -63,15 +69,15 @@ fn generatePHDR(pheaders: *std.ArrayList(elf.ProgramHeader)) !void {
     try pheaders.insert(1, load);
 }
 
-fn generateLoad(pheaders: *std.ArrayList(elf.ProgramHeader), section: *elf.Section, offset: *u64) !void {
+fn generateLoad(pheaders: *std.ArrayList(elf.ProgramHeader), section: *elf.Section, offset: u64, addr: *u64) !void {
     if (section.data.len == 0) return;
-    const addr = elf.START_ADDR + offset.*;
+    addr.* += 0x1000;
     const load = elf.ProgramHeader{
-        .type = elf.PHType.PT_LOAD,
-        .flags = 0b101,
-        .offset = offset.*,
-        .vaddr = addr + 0x1000,
-        .paddr = addr + 0x1000,
+        .type = .PT_LOAD,
+        .flags = elf.helpers.shToPhFlags(section.flags),
+        .offset = offset,
+        .vaddr = addr.*,
+        .paddr = addr.*,
         .filesz = section.data.len,
         .memsz = section.data.len,
         .align_ = 0x1000,
@@ -80,4 +86,21 @@ fn generateLoad(pheaders: *std.ArrayList(elf.ProgramHeader), section: *elf.Secti
     section.addr = load.vaddr;
 
     try pheaders.append(load);
+}
+
+fn generateNote(pheaders: *std.ArrayList(elf.ProgramHeader), section: *elf.Section, offset: u64, addr: *u64) !void {
+    const note = elf.ProgramHeader{
+        .type = .PT_NOTE,
+        .flags = elf.helpers.shToPhFlags(section.flags),
+        .offset = offset,
+        .vaddr = addr.*,
+        .paddr = addr.*,
+        .filesz = section.data.len,
+        .memsz = section.data.len,
+        .align_ = 0x8,
+    };
+
+    section.addr = note.vaddr;
+
+    try pheaders.append(note);
 }
