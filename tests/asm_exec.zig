@@ -64,3 +64,32 @@ test ".bss" {
 
     try std.testing.expectEqual(42, result);
 }
+
+test "hello world!" {
+    const main_asm =
+        \\ .section .text
+        \\ .global _start
+        \\ 
+        \\ _start:
+        \\     call print_hello
+        \\     mov $60, %rax
+        \\     mov $32, %rdi
+        \\     syscall
+        \\ 
+        \\ print_hello:
+        \\     mov $1, %rax
+        \\     mov $1, %rdi
+        \\     lea message(%rip), %rsi
+        \\     mov $14, %rdx          # length of string
+        \\     syscall
+        \\     ret
+        \\ 
+        \\ .section .rodata
+        \\ message:
+        \\     .ascii "Hello, world!\n"
+        \\
+    ;
+
+    const result = try helpers.build_exec(main_asm);
+    try std.testing.expectEqual(32, result);
+}
