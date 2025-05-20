@@ -6,7 +6,7 @@ const Section = elf.Section;
 const Relocation = elf.Relocation;
 
 pub fn addRelocationSections(self: *ElfLinker) !void {
-    const sections = &self.mutElf.sections.items;
+    const sections = self.mutElf.sections.items;
     const len = sections.len - 1;
 
     var rela_indexes = std.ArrayList(struct { Section, usize }).init(self.allocator);
@@ -14,17 +14,16 @@ pub fn addRelocationSections(self: *ElfLinker) !void {
 
     var rela_count: u32 = 0;
 
-    for (0..sections.len) |count| {
-        const section = sections.*[count];
+    for (sections, 0..) |*section, i| {
         if (section.relocations) |relocations| {
             const relocSection = try buildRelocationSection(
                 self.allocator,
                 relocations,
                 section.name,
                 len + 1,
-                count + rela_count,
+                i + rela_count,
             );
-            try rela_indexes.append(.{ relocSection, count + rela_count + 1 });
+            try rela_indexes.append(.{ relocSection, i + rela_count + 1 });
             rela_count += 1;
         }
     }

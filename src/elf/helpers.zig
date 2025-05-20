@@ -1,13 +1,8 @@
 const std = @import("std");
 
 pub fn getAlignment(size: u64, alignment: u64) u64 {
-    if (trailingZeros(size) == trailingZeros(alignment)) {
-        return size;
-    }
-    if (alignment == 0 or alignment == 1) {
-        return size;
-    }
-    return (size & (~alignment + 1)) + alignment;
+    if (alignment == 0) return size; // No alignment required
+    return (size + alignment - 1) & ~(alignment - 1);
 }
 
 pub fn trailingZeros(input: u64) u64 {

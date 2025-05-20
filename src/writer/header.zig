@@ -1,30 +1,25 @@
 const std = @import("std");
 const elf = @import("elf");
 
-pub fn writeHeader(header: elf.Header) ![64]u8 {
-    var bytes: [64]u8 = undefined;
-    bytes[0..4].* = elf.MAGIC_BYTES;
-    bytes[4] = header.class;
-    bytes[5] = if (header.data == std.builtin.Endian.little) 1 else 2;
-    bytes[6] = header.version;
-    bytes[7] = header.osabi;
-    bytes[8] = header.abiversion;
-
-    @memset(bytes[9..16], 0);
-
-    bytes[16..18].* = std.mem.toBytes(header.type);
-    bytes[18..20].* = std.mem.toBytes(header.machine);
-    bytes[20..24].* = std.mem.toBytes(header.file_version);
-    bytes[24..32].* = std.mem.toBytes(header.entry);
-    bytes[32..40].* = std.mem.toBytes(header.phoff);
-    bytes[40..48].* = std.mem.toBytes(header.shoff);
-    bytes[48..52].* = std.mem.toBytes(header.flags);
-    bytes[52..54].* = std.mem.toBytes(header.ehsize);
-    bytes[54..56].* = std.mem.toBytes(header.phentsize);
-    bytes[56..58].* = std.mem.toBytes(header.phnum);
-    bytes[58..60].* = std.mem.toBytes(header.shentsize);
-    bytes[60..62].* = std.mem.toBytes(header.shnum);
-    bytes[62..64].* = std.mem.toBytes(header.shstrndx);
-
-    return bytes;
+pub fn writeHeader(writer: std.fs.File.Writer, header: elf.Header) !void {
+    try writer.writeAll(&elf.MAGIC_BYTES);
+    try writer.writeByte(header.class);
+    try writer.writeByte(if (header.data == std.builtin.Endian.little) 1 else 2);
+    try writer.writeByte(header.version);
+    try writer.writeByte(header.osabi);
+    try writer.writeByte(header.abiversion);
+    try writer.writeByteNTimes(0, 16 - 9);
+    try writer.writeInt(u16, @intFromEnum(header.type), header.data);
+    try writer.writeInt(u16, header.machine, header.data);
+    try writer.writeInt(u32, header.file_version, header.data);
+    try writer.writeInt(u64, header.entry, header.data);
+    try writer.writeInt(u64, header.phoff, header.data);
+    try writer.writeInt(u64, header.shoff, header.data);
+    try writer.writeInt(u32, header.flags, header.data);
+    try writer.writeInt(u16, header.ehsize, header.data);
+    try writer.writeInt(u16, header.phentsize, header.data);
+    try writer.writeInt(u16, header.phnum, header.data);
+    try writer.writeInt(u16, header.shentsize, header.data);
+    try writer.writeInt(u16, header.shnum, header.data);
+    try writer.writeInt(u16, header.shstrndx, header.data);
 }

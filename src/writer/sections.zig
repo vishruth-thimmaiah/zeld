@@ -1,12 +1,8 @@
 const std = @import("std");
 const elf = @import("elf");
 
-pub fn writeSections(allocator: std.mem.Allocator, sheaders: []elf.Section) ![]u8 {
-    var bytes = std.ArrayList(u8).init(allocator);
-
+pub fn writeSections(file: std.fs.File.Writer, sheaders: []elf.Section) !void {
     for (sheaders) |sheader| {
-        try bytes.appendSlice(sheader.data);
+        try file.writeAll(sheader.data);
     }
-
-    return bytes.toOwnedSlice();
 }

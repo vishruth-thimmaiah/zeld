@@ -1,19 +1,17 @@
 const std = @import("std");
 const elf = @import("elf");
 
-pub fn writePHeader(allocator: std.mem.Allocator, pheaders: []elf.ProgramHeader) ![]u8 {
-    var bytes = try std.ArrayList(u8).initCapacity(allocator, pheaders.len);
+const little = std.builtin.Endian.little;
 
+pub fn writePHeader(file: std.fs.File.Writer, pheaders: []elf.ProgramHeader) !void {
     for (pheaders) |sheader| {
-        try bytes.appendSlice(&std.mem.toBytes(sheader.type));
-        try bytes.appendSlice(&std.mem.toBytes(sheader.flags));
-        try bytes.appendSlice(&std.mem.toBytes(sheader.offset));
-        try bytes.appendSlice(&std.mem.toBytes(sheader.vaddr));
-        try bytes.appendSlice(&std.mem.toBytes(sheader.paddr));
-        try bytes.appendSlice(&std.mem.toBytes(sheader.filesz));
-        try bytes.appendSlice(&std.mem.toBytes(sheader.memsz));
-        try bytes.appendSlice(&std.mem.toBytes(sheader.align_));
+        try file.writeInt(u32, @intFromEnum(sheader.type), little);
+        try file.writeInt(u32, sheader.flags, little);
+        try file.writeInt(u64, sheader.offset, little);
+        try file.writeInt(u64, sheader.vaddr, little);
+        try file.writeInt(u64, sheader.paddr, little);
+        try file.writeInt(u64, sheader.filesz, little);
+        try file.writeInt(u64, sheader.memsz, little);
+        try file.writeInt(u64, sheader.align_, little);
     }
-
-    return bytes.toOwnedSlice();
 }
