@@ -41,8 +41,8 @@ test "basic_with_print" {
         \\ }
     ;
     const result1 = try helpers.build_rela(test_c, main_c);
-    // const result2 = try helpers.build(main_c, test_c);
+    const result2 = try helpers.build_rela(main_c, test_c);
 
     try std.testing.expectEqual(3, result1);
-    // try std.testing.expectEqual(3, result2);
+    try std.testing.expectEqual(3, result2);
 }

@@ -4,21 +4,22 @@ const ElfLinker = @import("linker.zig").ElfLinker;
 
 pub fn mergeSections(linker: *ElfLinker, file: *const elf.Elf64) !std.StringHashMap(usize) {
     var section_map = std.StringHashMap(usize).init(linker.allocator);
+    const sections = &linker.mutElf.sections;
 
-    for (linker.mutElf.sections.items, 0..) |*section, i| {
+    for (sections.items, 0..) |*section, i| {
         try section_map.put(section.name, i);
     }
 
-    for (file.sections) |
-        section,
-    | {
+    for (file.sections) |*section| {
         if (section_map.get(section.name)) |index| {
-            const original_section = &linker.mutElf.sections.items[index];
+            const original_section = &sections.items[index];
             const alignment = elf.helpers.getAlignment(original_section.data.len, original_section.addralign);
             original_section.data = try mergeData(linker, original_section.data, section.data, alignment);
             original_section.relocations = try mergeRelas(linker, original_section.relocations, section.relocations, alignment);
         } else {
-            try linker.mutElf.sections.append(section);
+            try sections.append(section.*);
+            // FIXME: temporary solution for double free when appending a section
+            sections.items[sections.items.len - 1].data = try linker.allocator.dupe(u8, section.data);
             try section_map.put(section.name, linker.mutElf.sections.items.len - 1);
         }
     }
