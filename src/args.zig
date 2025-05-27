@@ -1,5 +1,6 @@
 const std = @import("std");
 const linker = @import("linker");
+const errors = @import("errors.zig");
 
 pub const Args = struct {
     inputs: [][]const u8,
@@ -33,11 +34,13 @@ pub const Args = struct {
                     results.output = output;
                     continue;
                 }
-                return error.MissingOutput;
+                return error.MissingTarget;
             } else if (streql(next, "-r", "--relocatable")) {
                 results.linker_args.output_type = .ET_REL;
-            } else {
+            } else if (next[0] != '-') {
                 try inputs.append(next);
+            } else {
+                errors.handleWarning(error.UnknownFlag);
             }
         }
 

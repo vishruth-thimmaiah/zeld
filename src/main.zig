@@ -5,19 +5,18 @@ const parser = @import("parser");
 const ElfLinker = @import("linker").ElfLinker;
 const writer = @import("writer");
 const Args = @import("args.zig").Args;
+const errors = @import("errors.zig");
 
 const print = std.debug.print;
 
 pub fn main() !void {
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
     const allocator = gpa.allocator();
 
-    const args = Args.parse(allocator) catch |err| {
-        print("Error {s}: Failed to parse args\n", .{@errorName(err)});
-        std.process.exit(1);
-    };
+    const args = Args.parse(allocator) catch |err| errors.handleError(err);
     defer args.deinit();
 
     const start_file = try parser.new(allocator, &args.inputs[0]);
