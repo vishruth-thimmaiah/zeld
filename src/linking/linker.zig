@@ -11,6 +11,7 @@ const MutElf64 = @import("mutelf.zig").MutElf64;
 
 pub const LinkerArgs = struct {
     output_type: elf.EType,
+    dynamic_linker: ?[]const u8,
 };
 
 pub const ElfLinker = struct {
@@ -42,6 +43,7 @@ pub const ElfLinker = struct {
     }
 
     pub fn link(self: *ElfLinker) !void {
+        try self.addDynamicSection();
         try SectionMerger.organizeSections(self);
         if (self.args.output_type == .ET_REL) {
             try relocations.addRelocationSections(self);
@@ -84,6 +86,30 @@ pub const ElfLinker = struct {
         header.shoff = shoff + header.phnum * header.phentsize;
         header.shnum = shnum;
         header.shstrndx = shnum - 1;
+    }
+
+    fn addDynamicSection(self: *ElfLinker) !void {
+        if (self.args.dynamic_linker == null) return;
+        const dynamic_linker = self.args.dynamic_linker.?;
+        const sections = &self.mutElf.sections;
+        var data = try self.allocator.alloc(u8, dynamic_linker.len + 1);
+        @memcpy(data[0..dynamic_linker.len], dynamic_linker);
+        data[self.args.dynamic_linker.?.len] = 0;
+        const interp = elf.Section{
+            .name = ".interp",
+            .type = .SHT_PROGBITS,
+            .flags = 0b010,
+            .addr = 0,
+            .data = data,
+            .link = 0,
+            .info = 0,
+            .addralign = 0x1,
+            .entsize = 0,
+            .relocations = null,
+
+            .allocator = self.allocator,
+        };
+        try sections.insert(0, interp);
     }
 
     pub fn deinit(self: *const ElfLinker) void {

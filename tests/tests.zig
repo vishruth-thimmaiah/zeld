@@ -73,7 +73,10 @@ pub fn build_rela(input_1: []const u8, input_2: []const u8) !u8 {
         }
     }
 
-    var elfLinker = try linker.new(allocator, &elfFiles[0], .{ .output_type = .ET_REL });
+    var elfLinker = try linker.new(allocator, &elfFiles[0], .{
+        .output_type = .ET_REL,
+        .dynamic_linker = null,
+    });
     defer elfLinker.deinit();
     try elfLinker.merge(&elfFiles[1]);
     try elfLinker.link();
@@ -96,7 +99,10 @@ pub fn build_exec(input: []const u8) !u8 {
     const elfFile = try parser.new(allocator, &file);
     defer elfFile.deinit();
 
-    var elfLinker = try linker.new(allocator, &elfFile, .{ .output_type = .ET_EXEC });
+    var elfLinker = try linker.new(allocator, &elfFile, .{
+        .output_type = .ET_EXEC,
+        .dynamic_linker = null,
+    });
     defer elfLinker.deinit();
     try elfLinker.link();
 
@@ -112,7 +118,7 @@ pub fn build_exec(input: []const u8) !u8 {
     try run_command.spawn();
     const result = try run_command.wait();
     if (result == .Signal) {
-	   	std.log.warn("Failed to run with signal: {d}", .{result.Signal});
+        std.log.warn("Failed to run with signal: {d}", .{result.Signal});
         return error.FailedToRun;
     }
     return result.Exited;

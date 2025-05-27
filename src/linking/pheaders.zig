@@ -11,7 +11,13 @@ pub fn generatePheaders(linker: *ElfLinker) !void {
 
     for (sections) |*section| {
         switch (section.type) {
-            .SHT_PROGBITS => try generateLoad(pheaders, section, offset, &addr),
+            .SHT_PROGBITS => {
+                if (std.mem.eql(u8, section.name, ".interp")) {
+                    try generateInterp(pheaders, section, offset, &addr);
+                } else {
+                    try generateLoad(pheaders, section, offset, &addr);
+                }
+            },
             .SHT_NOTE => try generateNote(pheaders, section, offset, &addr),
             .SHT_NOBITS => try generateLoad(pheaders, section, offset, &addr),
 
@@ -67,6 +73,23 @@ fn generatePHDR(pheaders: *std.ArrayList(elf.ProgramHeader)) !void {
         .align_ = 0x1000,
     };
     try pheaders.insert(1, load);
+}
+
+fn generateInterp(pheaders: *std.ArrayList(elf.ProgramHeader), section: *elf.Section, offset: u64, addr: *u64) !void {
+    const interp = elf.ProgramHeader{
+        .type = .PT_INTERP,
+        .flags = elf.helpers.shToPhFlags(section.flags),
+        .offset = offset,
+        .vaddr = addr.*,
+        .paddr = addr.*,
+        .filesz = section.data.len,
+        .memsz = section.data.len,
+        .align_ = 0x1,
+    };
+
+    section.addr = interp.vaddr;
+
+    try pheaders.append(interp);
 }
 
 fn generateLoad(pheaders: *std.ArrayList(elf.ProgramHeader), section: *elf.Section, offset: u64, addr: *u64) !void {

@@ -21,6 +21,7 @@ pub const Args = struct {
             .output = "a.out",
             .linker_args = .{
                 .output_type = .ET_EXEC,
+                .dynamic_linker = null,
             },
 
             .allocator = allocator,
@@ -37,6 +38,12 @@ pub const Args = struct {
                 return error.MissingTarget;
             } else if (streql(next, "-r", "--relocatable")) {
                 results.linker_args.output_type = .ET_REL;
+            } else if (streql(next, null, "-dynamic-linker")) {
+                if (args.next()) |dy_linker| {
+                    results.linker_args.dynamic_linker = dy_linker;
+                    continue;
+                }
+                return error.MissingInput;
             } else if (next[0] != '-') {
                 try inputs.append(next);
             } else {
@@ -57,6 +64,9 @@ pub const Args = struct {
     }
 };
 
-fn streql(arg: []const u8, short: []const u8, long: []const u8) bool {
-    return std.mem.eql(u8, arg, short) or std.mem.eql(u8, arg, long);
+fn streql(arg: []const u8, short: ?[]const u8, long: []const u8) bool {
+    if (short) |s| {
+        return std.mem.eql(u8, arg, s) or std.mem.eql(u8, arg, long);
+    }
+    return std.mem.eql(u8, arg, long);
 }
