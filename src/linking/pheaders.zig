@@ -3,17 +3,38 @@ const elf = @import("elf");
 const ElfLinker = @import("linker.zig").ElfLinker;
 
 const SegmentArray = std.ArrayList(*elf.Section);
+const SegmentMap = std.AutoHashMap(struct { elf.PHType, u32 }, SegmentArray);
 
 const Segment = union(enum) {
     SEGMENT_START: struct { elf.PHType, u32, u64 },
     SEGMENT_END,
     SECTION: *elf.Section,
+
+    fn mapSegment(segments: *SegmentMap, section: *elf.Section, type_: elf.PHType, flags: u32) !void {
+        const segment = try segments.getOrPutValue(.{ type_, flags }, SegmentArray.init(segments.allocator));
+        try segment.value_ptr.append(section);
+    }
+
+    fn mapToSequence(
+        segments: *const SegmentArray,
+        pheaders: *std.ArrayList(Segment),
+        counter: *u32,
+        type_: elf.PHType,
+        flags: u32,
+        align_: u64,
+    ) !void {
+        try pheaders.append(.{ .SEGMENT_START = .{ type_, flags, align_ } });
+        counter.* += 1;
+        for (segments.items) |section| try pheaders.append(.{ .SECTION = section });
+
+        try pheaders.append(.SEGMENT_END);
+    }
 };
 
 fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
     const sections = linker.mutElf.sections.items;
 
-    var segments = std.AutoHashMap(struct { elf.PHType, u32 }, SegmentArray).init(linker.allocator);
+    var segments = SegmentMap.init(linker.allocator);
     defer segments.deinit();
 
     defer {
@@ -23,25 +44,17 @@ fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
         }
     }
 
-    // TODO: refactor redundant code
     for (sections) |*section| {
         if (std.mem.eql(u8, section.name, ".interp")) {
-            const interp = try segments.getOrPutValue(.{ .PT_INTERP, 0b100 }, SegmentArray.init(linker.allocator));
-            try interp.value_ptr.append(section);
+            try Segment.mapSegment(&segments, section, .PT_INTERP, 0b100);
         } else if (section.flags & 0b110 == 0b110) {
-            const load = try segments.getOrPutValue(.{ .PT_LOAD, 0b101 }, SegmentArray.init(linker.allocator));
-            try load.value_ptr.append(section);
+            try Segment.mapSegment(&segments, section, .PT_LOAD, 0b101);
         } else if (section.flags & 0b011 == 0b011) {
-            const load = try segments.getOrPutValue(.{ .PT_LOAD, 0b110 }, SegmentArray.init(linker.allocator));
-            try load.value_ptr.append(section);
+            try Segment.mapSegment(&segments, section, .PT_LOAD, 0b110);
         } else if (section.type == .SHT_NOTE) {
-            const load = try segments.getOrPutValue(.{ .PT_LOAD, 0b100 }, SegmentArray.init(linker.allocator));
-            try load.value_ptr.append(section);
-            const note = try segments.getOrPutValue(.{ .PT_NOTE, 0b100 }, SegmentArray.init(linker.allocator));
-            try note.value_ptr.append(section);
+            try Segment.mapSegment(&segments, section, .PT_NOTE, 0b100);
         } else if (section.flags & 0b010 == 0b010) {
-            const load = try segments.getOrPutValue(.{ .PT_LOAD, 0b100 }, SegmentArray.init(linker.allocator));
-            try load.value_ptr.append(section);
+            try Segment.mapSegment(&segments, section, .PT_LOAD, 0b100);
         } else {
             return error.UnmappedSection;
         }
@@ -53,43 +66,20 @@ fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
     // TODO: verify the sections are continuous
     var segment_count: u32 = 0;
 
-    if (segments.get(.{ .PT_INTERP, 0b100 })) |*interp| {
-        try segment_format.append(.{ .SEGMENT_START = .{ .PT_INTERP, 0b100, 0x1 } });
-        segment_count += 1;
-        for (interp.items) |section| try segment_format.append(.{ .SECTION = section });
+    if (segments.get(.{ .PT_INTERP, 0b100 })) |*interp|
+        try Segment.mapToSequence(interp, &segment_format, &segment_count, .PT_INTERP, 0b100, 0x1);
 
-        try segment_format.append(.SEGMENT_END);
-    }
+    if (segments.get(.{ .PT_LOAD, 0b100 })) |*load|
+        try Segment.mapToSequence(load, &segment_format, &segment_count, .PT_LOAD, 0b100, 0x1000);
 
-    if (segments.get(.{ .PT_LOAD, 0b100 })) |*load| {
-        try segment_format.append(.{ .SEGMENT_START = .{ .PT_LOAD, 0b100, 0x1000 } });
-        segment_count += 1;
-        for (load.items) |section| try segment_format.append(.{ .SECTION = section });
+    if (segments.get(.{ .PT_NOTE, 0b100 })) |*note|
+        try Segment.mapToSequence(note, &segment_format, &segment_count, .PT_NOTE, 0b100, 0x8);
 
-        try segment_format.append(.SEGMENT_END);
-    }
+    if (segments.get(.{ .PT_LOAD, 0b101 })) |*load|
+        try Segment.mapToSequence(load, &segment_format, &segment_count, .PT_LOAD, 0b101, 0x1000);
 
-    if (segments.get(.{ .PT_NOTE, 0b100 })) |*note| {
-        try segment_format.append(.{ .SEGMENT_START = .{ .PT_NOTE, 0b100, 0x8 } });
-        segment_count += 1;
-        for (note.items) |section| try segment_format.append(.{ .SECTION = section });
-
-        try segment_format.append(.SEGMENT_END);
-    }
-    if (segments.get(.{ .PT_LOAD, 0b101 })) |*load| {
-        segment_count += 1;
-        try segment_format.append(.{ .SEGMENT_START = .{ .PT_LOAD, 0b101, 0x1000 } });
-        for (load.items) |section| try segment_format.append(.{ .SECTION = section });
-
-        try segment_format.append(.SEGMENT_END);
-    }
-    if (segments.get(.{ .PT_LOAD, 0b110 })) |*load| {
-        segment_count += 1;
-        try segment_format.append(.{ .SEGMENT_START = .{ .PT_LOAD, 0b110, 0x1000 } });
-        for (load.items) |section| try segment_format.append(.{ .SECTION = section });
-
-        try segment_format.append(.SEGMENT_END);
-    }
+    if (segments.get(.{ .PT_LOAD, 0b110 })) |*load|
+        try Segment.mapToSequence(load, &segment_format, &segment_count, .PT_LOAD, 0b110, 0x1000);
 
     return .{ try segment_format.toOwnedSlice(), segment_count };
 }
