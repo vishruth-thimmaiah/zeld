@@ -2,48 +2,160 @@ const std = @import("std");
 const elf = @import("elf");
 const ElfLinker = @import("linker.zig").ElfLinker;
 
-pub fn generatePheaders(linker: *ElfLinker) !void {
+const SegmentArray = std.ArrayList(*elf.Section);
+
+const Segment = union(enum) {
+    SEGMENT_START: struct { elf.PHType, u32, u64 },
+    SEGMENT_END,
+    SECTION: *elf.Section,
+};
+
+fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
     const sections = linker.mutElf.sections.items;
+
+    var segments = std.AutoHashMap(struct { elf.PHType, u32 }, SegmentArray).init(linker.allocator);
+    defer segments.deinit();
+
+    defer {
+        var value_iter = segments.valueIterator();
+        while (value_iter.next()) |entry| {
+            entry.deinit();
+        }
+    }
+
+    // TODO: refactor redundant code
+    for (sections) |*section| {
+        if (std.mem.eql(u8, section.name, ".interp")) {
+            const interp = try segments.getOrPutValue(.{ .PT_INTERP, 0b100 }, SegmentArray.init(linker.allocator));
+            try interp.value_ptr.append(section);
+        } else if (section.flags & 0b110 == 0b110) {
+            const load = try segments.getOrPutValue(.{ .PT_LOAD, 0b101 }, SegmentArray.init(linker.allocator));
+            try load.value_ptr.append(section);
+        } else if (section.flags & 0b011 == 0b011) {
+            const load = try segments.getOrPutValue(.{ .PT_LOAD, 0b110 }, SegmentArray.init(linker.allocator));
+            try load.value_ptr.append(section);
+        } else if (section.type == .SHT_NOTE) {
+            const load = try segments.getOrPutValue(.{ .PT_LOAD, 0b100 }, SegmentArray.init(linker.allocator));
+            try load.value_ptr.append(section);
+            const note = try segments.getOrPutValue(.{ .PT_NOTE, 0b100 }, SegmentArray.init(linker.allocator));
+            try note.value_ptr.append(section);
+        } else if (section.flags & 0b010 == 0b010) {
+            const load = try segments.getOrPutValue(.{ .PT_LOAD, 0b100 }, SegmentArray.init(linker.allocator));
+            try load.value_ptr.append(section);
+        } else {
+            return error.UnmappedSection;
+        }
+    }
+
+    var segment_format = std.ArrayList(Segment).init(linker.allocator);
+    defer segment_format.deinit();
+
+    // TODO: verify the sections are continuous
+    var segment_count: u32 = 0;
+
+    if (segments.get(.{ .PT_INTERP, 0b100 })) |*interp| {
+        try segment_format.append(.{ .SEGMENT_START = .{ .PT_INTERP, 0b100, 0x1 } });
+        segment_count += 1;
+        for (interp.items) |section| try segment_format.append(.{ .SECTION = section });
+
+        try segment_format.append(.SEGMENT_END);
+    }
+
+    if (segments.get(.{ .PT_LOAD, 0b100 })) |*load| {
+        try segment_format.append(.{ .SEGMENT_START = .{ .PT_LOAD, 0b100, 0x1000 } });
+        segment_count += 1;
+        for (load.items) |section| try segment_format.append(.{ .SECTION = section });
+
+        try segment_format.append(.SEGMENT_END);
+    }
+
+    if (segments.get(.{ .PT_NOTE, 0b100 })) |*note| {
+        try segment_format.append(.{ .SEGMENT_START = .{ .PT_NOTE, 0b100, 0x8 } });
+        segment_count += 1;
+        for (note.items) |section| try segment_format.append(.{ .SECTION = section });
+
+        try segment_format.append(.SEGMENT_END);
+    }
+    if (segments.get(.{ .PT_LOAD, 0b101 })) |*load| {
+        segment_count += 1;
+        try segment_format.append(.{ .SEGMENT_START = .{ .PT_LOAD, 0b101, 0x1000 } });
+        for (load.items) |section| try segment_format.append(.{ .SECTION = section });
+
+        try segment_format.append(.SEGMENT_END);
+    }
+    if (segments.get(.{ .PT_LOAD, 0b110 })) |*load| {
+        segment_count += 1;
+        try segment_format.append(.{ .SEGMENT_START = .{ .PT_LOAD, 0b110, 0x1000 } });
+        for (load.items) |section| try segment_format.append(.{ .SECTION = section });
+
+        try segment_format.append(.SEGMENT_END);
+    }
+
+    return .{ try segment_format.toOwnedSlice(), segment_count };
+}
+
+pub fn generatePheaders(linker: *ElfLinker) !void {
+    const sb = try SegmentBuilder(linker);
+    const segments = sb.@"0";
+    const segment_count = sb.@"1" + 1; // +1 for the PHDR
+    defer linker.allocator.free(segments);
+
+    const sections = linker.mutElf.sections.items;
+
+    var vaddr: u64 = (elf.START_ADDR | 64) + segment_count * @sizeOf(elf.ProgramHeader);
+
+    for (sections) |*section| {
+        section.addr = vaddr;
+        vaddr += section.data.len;
+    }
+
     linker.mutElf.pheaders = std.ArrayList(elf.ProgramHeader).init(linker.allocator);
     const pheaders = &linker.mutElf.pheaders.?;
-    var offset: u64 = 64;
-    var addr: u64 = elf.START_ADDR | 64;
+    var load_count: usize = 0;
+    var memsz: u64 = 0;
 
-    for (sections) |*section| {
-        switch (section.type) {
-            .SHT_PROGBITS => {
-                if (std.mem.eql(u8, section.name, ".interp")) {
-                    try generateInterp(pheaders, section, offset, &addr);
-                } else {
-                    try generateLoad(pheaders, section, offset, &addr);
+    try pheaders.append(generatePHDR(segment_count));
+
+    for (segments) |*segment| {
+        switch (segment.*) {
+            .SEGMENT_START => |start| {
+                memsz = 0;
+                if (load_count == 0) {
+                    memsz += 0x40 + 56 * segment_count;
+                }
+                try pheaders.append(elf.ProgramHeader{
+                    .type = start.@"0",
+                    .flags = start.@"1",
+                    .offset = 0,
+                    .vaddr = if (load_count == 0) elf.START_ADDR else 0,
+                    .paddr = if (load_count == 0) elf.START_ADDR else 0,
+                    .filesz = memsz,
+                    .memsz = memsz,
+                    .align_ = start.@"2",
+                });
+                if (start.@"0" == .PT_LOAD) load_count += 1;
+            },
+            .SEGMENT_END => {
+                const pheader = &pheaders.items[pheaders.items.len - 1];
+                pheader.setSize(memsz);
+            },
+            .SECTION => |section| {
+                memsz += section.data.len;
+                const pheader = &pheaders.items[pheaders.items.len - 1];
+                if (pheader.type == .PT_LOAD) {
+                    section.addr += (load_count - 1) * 0x1000;
+                }
+                if (pheader.vaddr == 0) {
+                    pheader.setAddr(section.addr);
+                    pheader.offset = section.addr - elf.START_ADDR - (load_count - 1) * 0x1000; // FIXME: Temporary hack
                 }
             },
-            .SHT_NOTE => try generateNote(pheaders, section, offset, &addr),
-            .SHT_NOBITS => try generateLoad(pheaders, section, offset, &addr),
-
-            .SHT_NULL, .SHT_RELA, .SHT_STRTAB, .SHT_SYMTAB => {},
-            // TODO
-            else => unreachable,
         }
-        offset += section.data.len;
-        addr += section.data.len;
-    }
-
-    try generatePHDR(pheaders);
-
-    for (pheaders.items[2..]) |*pheader| {
-        pheader.setAddr(pheader.vaddr + pheaders.items.len * @sizeOf(elf.ProgramHeader));
-        pheader.offset += pheaders.items.len * @sizeOf(elf.ProgramHeader);
-    }
-
-    for (sections) |*section| {
-        if (section.flags & 0b010 == 0) continue;
-        section.addr += pheaders.items.len * @sizeOf(elf.ProgramHeader);
     }
 }
 
-fn generatePHDR(pheaders: *std.ArrayList(elf.ProgramHeader)) !void {
-    var sizeof = (pheaders.items.len + 2) * @sizeOf(elf.ProgramHeader);
+fn generatePHDR(segment_count: u32) elf.ProgramHeader {
+    const sizeof = (segment_count) * @sizeOf(elf.ProgramHeader);
     const phdr = elf.ProgramHeader{
         .type = elf.PHType.PT_PHDR,
         .flags = 0b100,
@@ -55,75 +167,5 @@ fn generatePHDR(pheaders: *std.ArrayList(elf.ProgramHeader)) !void {
         .align_ = 0x8,
     };
 
-    for (pheaders.items) |*pheader| {
-        if (pheader.type != .PT_NOTE) break;
-        sizeof += pheader.offset + pheader.memsz;
-    }
-
-    try pheaders.insert(0, phdr);
-
-    const load = elf.ProgramHeader{
-        .type = .PT_LOAD,
-        .flags = 0b100,
-        .offset = 0,
-        .vaddr = elf.START_ADDR,
-        .paddr = elf.START_ADDR,
-        .filesz = sizeof + 64,
-        .memsz = sizeof + 64,
-        .align_ = 0x1000,
-    };
-    try pheaders.insert(1, load);
-}
-
-fn generateInterp(pheaders: *std.ArrayList(elf.ProgramHeader), section: *elf.Section, offset: u64, addr: *u64) !void {
-    const interp = elf.ProgramHeader{
-        .type = .PT_INTERP,
-        .flags = elf.helpers.shToPhFlags(section.flags),
-        .offset = offset,
-        .vaddr = addr.*,
-        .paddr = addr.*,
-        .filesz = section.data.len,
-        .memsz = section.data.len,
-        .align_ = 0x1,
-    };
-
-    section.addr = interp.vaddr;
-
-    try pheaders.append(interp);
-}
-
-fn generateLoad(pheaders: *std.ArrayList(elf.ProgramHeader), section: *elf.Section, offset: u64, addr: *u64) !void {
-    if (section.data.len == 0) return;
-    addr.* += 0x1000;
-    const load = elf.ProgramHeader{
-        .type = .PT_LOAD,
-        .flags = elf.helpers.shToPhFlags(section.flags),
-        .offset = offset,
-        .vaddr = addr.*,
-        .paddr = addr.*,
-        .filesz = section.data.len,
-        .memsz = section.data.len,
-        .align_ = 0x1000,
-    };
-
-    section.addr = load.vaddr;
-
-    try pheaders.append(load);
-}
-
-fn generateNote(pheaders: *std.ArrayList(elf.ProgramHeader), section: *elf.Section, offset: u64, addr: *u64) !void {
-    const note = elf.ProgramHeader{
-        .type = .PT_NOTE,
-        .flags = elf.helpers.shToPhFlags(section.flags),
-        .offset = offset,
-        .vaddr = addr.*,
-        .paddr = addr.*,
-        .filesz = section.data.len,
-        .memsz = section.data.len,
-        .align_ = 0x8,
-    };
-
-    section.addr = note.vaddr;
-
-    try pheaders.append(note);
+    return phdr;
 }
