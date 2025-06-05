@@ -14,6 +14,12 @@ const Segment = union(enum) {
         try segments.append(.{ .SECTION = section });
         try segments.append(.SEGMENT_END);
     }
+
+    fn prependSingleSegment(segments: *SegmentArray, section: *elf.Section, offset: u64, type_: elf.PHType, flags: u32, align_: u64) !void {
+        try segments.insert(0, .{ .SEGMENT_START = .{ type_, flags, align_, offset } });
+        try segments.insert(1, .{ .SECTION = section });
+        try segments.insert(2, .SEGMENT_END);
+    }
 };
 
 fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
@@ -28,12 +34,6 @@ fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
     var offset: u64 = 0x40;
 
     for (sections) |*section| {
-        if (std.mem.eql(u8, section.name, ".interp")) {
-            try segments.append(.{ .SEGMENT_START = .{ .PT_INTERP, 0b100, 0x1, offset } });
-            counter += 1;
-            try segments.append(.{ .SECTION = section });
-            try segments.append(.SEGMENT_END);
-        }
         var flags: ?u32 = null;
         switch (section.flags) {
             0b110 => flags = 0b101,
@@ -60,6 +60,10 @@ fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
             try segments.append(.{ .SECTION = section });
         }
 
+        if (std.mem.eql(u8, section.name, ".interp")) {
+            try Segment.prependSingleSegment(&segments, section, offset, .PT_INTERP, 0b100, 0x1);
+            counter += 1;
+        }
         if (section.type == .SHT_NOTE) {
             try Segment.addSingleSegment(&other_segments, section, offset, .PT_NOTE, 0b100, 0x8);
             counter += 1;
@@ -76,6 +80,14 @@ fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
     for (sections) |*section| {
         section.addr += 0x40 + (counter + 1) * @sizeOf(elf.ProgramHeader);
     }
+
+    // for (segments.items) |*segment| {
+    //     switch (segment.*) {
+    //         .SEGMENT_START => |start| std.debug.print("start: {any}\n", .{start}),
+    //         .SEGMENT_END => std.debug.print("end\n", .{}),
+    //         .SECTION => |section| std.debug.print("section: {s}\n", .{section.name}),
+    //     }
+    // }
 
     return .{ try segments.toOwnedSlice(), counter };
 }
@@ -98,15 +110,16 @@ pub fn generatePheaders(linker: *ElfLinker) !void {
         switch (segment.*) {
             .SEGMENT_START => |start| {
                 memsz = 0;
-                if (load_count == 0) {
+                const is_first_load = load_count == 0 and start.@"0" == .PT_LOAD;
+                if (is_first_load) {
                     memsz += 0x40 + 56 * segment_count;
                 }
                 try pheaders.append(elf.ProgramHeader{
                     .type = start.@"0",
                     .flags = start.@"1",
-                    .offset = if (load_count == 0) 0 else start.@"3" + segment_count * @sizeOf(elf.ProgramHeader),
-                    .vaddr = if (load_count == 0) elf.START_ADDR else 0,
-                    .paddr = if (load_count == 0) elf.START_ADDR else 0,
+                    .offset = if (is_first_load) 0 else start.@"3" + segment_count * @sizeOf(elf.ProgramHeader),
+                    .vaddr = if (is_first_load) elf.START_ADDR else 0,
+                    .paddr = if (is_first_load) elf.START_ADDR else 0,
                     .filesz = memsz,
                     .memsz = memsz,
                     .align_ = start.@"2",
