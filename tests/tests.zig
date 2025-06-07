@@ -76,6 +76,7 @@ pub fn build_rela(input_1: []const u8, input_2: []const u8) !u8 {
     var elfLinker = try linker.new(allocator, &elfFiles[0], .{
         .output_type = .ET_REL,
         .dynamic_linker = null,
+        .shared_libs = undefined,
     });
     defer elfLinker.deinit();
     try elfLinker.merge(&elfFiles[1]);
@@ -102,6 +103,7 @@ pub fn build_exec(input: []const u8) !u8 {
     var elfLinker = try linker.new(allocator, &elfFile, .{
         .output_type = .ET_EXEC,
         .dynamic_linker = null,
+        .shared_libs = undefined,
     });
     defer elfLinker.deinit();
     try elfLinker.link();

@@ -12,6 +12,7 @@ const MutElf64 = @import("mutelf.zig").MutElf64;
 pub const LinkerArgs = struct {
     output_type: elf.EType,
     dynamic_linker: ?[]const u8,
+    shared_libs: [][]const u8,
 };
 
 pub const ElfLinker = struct {
