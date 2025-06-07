@@ -21,6 +21,9 @@ pub const STBind = @import("symbols.zig").STBind;
 pub const STType = @import("symbols.zig").STType;
 pub const STNdx = @import("symbols.zig").STNdx;
 
+pub const Dynamic = @import("dynamic.zig").Dynamic;
+pub const DType = @import("dynamic.zig").DTypes;
+
 pub const helpers = @import("helpers.zig");
 
 pub const Elf64 = struct {
