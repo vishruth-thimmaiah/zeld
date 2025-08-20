@@ -63,7 +63,7 @@ pub fn organizeSections(linker: *ElfLinker) !void {
 }
 
 fn lessThan(_: void, a: elf.Section, b: elf.Section) bool {
-    const a_order = elf.helpers.sectionSortOrder(a.name);
-    const b_order = elf.helpers.sectionSortOrder(b.name);
+    const a_order = elf.helpers.sectionSortOrder(a);
+    const b_order = elf.helpers.sectionSortOrder(b);
     return a_order < b_order;
 }
