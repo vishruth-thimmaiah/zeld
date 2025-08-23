@@ -59,11 +59,11 @@ fn mergeRelas(
 }
 
 pub fn organizeSections(linker: *ElfLinker) !void {
-    std.sort.heap(elf.Section, linker.mutElf.sections.items, {}, lessThan);
-}
-
-fn lessThan(_: void, a: elf.Section, b: elf.Section) bool {
-    const a_order = elf.helpers.sectionSortOrder(a);
-    const b_order = elf.helpers.sectionSortOrder(b);
-    return a_order < b_order;
+    std.sort.heap(elf.Section, linker.mutElf.sections.items, {}, struct {
+        fn lessThan(_: void, a: elf.Section, b: elf.Section) bool {
+            const a_order = elf.helpers.sectionSortOrder(a);
+            const b_order = elf.helpers.sectionSortOrder(b);
+            return a_order < b_order;
+        }
+    }.lessThan);
 }

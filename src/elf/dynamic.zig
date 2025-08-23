@@ -2,13 +2,13 @@ const std = @import("std");
 
 pub const Dynamic = struct {
     tag: DTypes,
-    un: union {
+    un: union(enum) {
         val: u64,
         ptr: usize,
     },
 };
 
-pub const DTypes = enum(i32) {
+pub const DTypes = enum(u32) {
     DT_NULL = 0,
     DT_NEEDED = 1, // d_val
     DT_PLTRELSZ = 2, // d_val

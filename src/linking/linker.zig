@@ -6,6 +6,7 @@ const shstrtab = @import("shstrtab.zig");
 const SectionMerger = @import("sections.zig");
 const SymbolMerger = @import("symbols.zig");
 const PheaderGenerator = @import("pheaders.zig");
+const dynamic = @import("dynamic.zig");
 const buildSHeaders = @import("sheaders.zig").buildSHeaders;
 const MutElf64 = @import("mutelf.zig").MutElf64;
 
@@ -44,13 +45,15 @@ pub const ElfLinker = struct {
     }
 
     pub fn link(self: *ElfLinker) !void {
-        try self.addDynamicSection();
-        try SectionMerger.organizeSections(self);
+        try self.addInterpSection();
         if (self.args.output_type == .ET_REL) {
             try relocations.addRelocationSections(self);
         }
         if (self.args.output_type == .ET_EXEC) {
+            const dyn = try dynamic.createDynamicSection(self);
+            try SectionMerger.organizeSections(self);
             try PheaderGenerator.generatePheaders(self);
+            try dynamic.updateDynamicSection(self, dyn);
             try SymbolMerger.updateMemValues(self);
             try relocations.applyRelocations(self);
         }
@@ -89,13 +92,13 @@ pub const ElfLinker = struct {
         header.shstrndx = shnum - 1;
     }
 
-    fn addDynamicSection(self: *ElfLinker) !void {
+    fn addInterpSection(self: *ElfLinker) !void {
         if (self.args.dynamic_linker == null) return;
         const dynamic_linker = self.args.dynamic_linker.?;
         const sections = &self.mutElf.sections;
         var data = try self.allocator.alloc(u8, dynamic_linker.len + 1);
         @memcpy(data[0..dynamic_linker.len], dynamic_linker);
-        data[self.args.dynamic_linker.?.len] = 0;
+        data[dynamic_linker.len] = 0;
         const interp = elf.Section{
             .name = ".interp",
             .type = .SHT_PROGBITS,

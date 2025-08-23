@@ -68,6 +68,10 @@ fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
             try Segment.addSingleSegment(&other_segments, section, offset, .PT_NOTE, 0b100, 0x8);
             counter += 1;
         }
+        if (section.type == .SHT_DYNAMIC) {
+            try Segment.addSingleSegment(&other_segments, section, offset, .PT_DYNAMIC, 0b101, 0x8);
+            counter += 1;
+        }
 
         section.addr = addr;
         addr += section.data.len;
