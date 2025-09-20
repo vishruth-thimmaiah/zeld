@@ -4,3 +4,6 @@ a.out
 
 examples/**/*.o
 examples/**/*.out
+
+.zed
+.vscode

@@ -169,23 +169,7 @@ fn buildSymbolSection(
             name = std.mem.zeroes([4]u8);
         }
 
-        var shndx: [2]u8 = undefined;
-        if (sym.shndx.isSpecial()) {
-            std.mem.writeInt(u16, &shndx, sym.shndx.toIntFromMap(section_map), std.builtin.Endian.little);
-        } else {
-            std.mem.writeInt(u16, &shndx, sym.shndx.toIntFromMap(section_map) + 1, std.builtin.Endian.little);
-        }
-        var value: [8]u8 = undefined;
-        std.mem.writeInt(u64, &value, sym.value, std.builtin.Endian.little);
-        var size: [8]u8 = undefined;
-        std.mem.writeInt(u64, &size, sym.size, std.builtin.Endian.little);
-
-        try data.appendSlice(&name);
-        try data.append(sym.info);
-        try data.append(sym.other);
-        try data.appendSlice(&shndx);
-        try data.appendSlice(&value);
-        try data.appendSlice(&size);
+        try symbolToData(sym, name, section_map, &data);
     }
 
     return elf.Section{
@@ -203,6 +187,28 @@ fn buildSymbolSection(
 
         .allocator = allocator,
     };
+}
+
+pub fn symbolToData(symbol: elf.Symbol, name_idx: [4]u8, section_map: ?std.StringHashMap(usize), data: *std.ArrayList(u8)) !void {
+    var shndx: [2]u8 = undefined;
+    if (section_map == null) {
+        std.mem.writeInt(u16, &shndx, 0, std.builtin.Endian.little);
+    } else if (symbol.shndx.isSpecial()) {
+        std.mem.writeInt(u16, &shndx, symbol.shndx.toIntFromMap(section_map.?), std.builtin.Endian.little);
+    } else {
+        std.mem.writeInt(u16, &shndx, symbol.shndx.toIntFromMap(section_map.?) + 1, std.builtin.Endian.little);
+    }
+    var value: [8]u8 = undefined;
+    std.mem.writeInt(u64, &value, symbol.value, std.builtin.Endian.little);
+    var size: [8]u8 = undefined;
+    std.mem.writeInt(u64, &size, symbol.size, std.builtin.Endian.little);
+
+    try data.appendSlice(&name_idx);
+    try data.append(symbol.info);
+    try data.append(symbol.other);
+    try data.appendSlice(&shndx);
+    try data.appendSlice(&value);
+    try data.appendSlice(&size);
 }
 
 pub fn updateMemValues(linker: *ElfLinker) !void {

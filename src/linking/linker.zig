@@ -119,7 +119,7 @@ pub const ElfLinker = struct {
     pub fn deinit(self: *const ElfLinker) void {
         for (self.out.sections) |section| {
             self.allocator.free(section.data);
-            if (section.name.len > 4 and std.mem.eql(u8, section.name[0..5], ".rela")) {
+            if (section.name.len > 4 and std.mem.eql(u8, section.name[0..5], ".rela") and !std.mem.eql(u8, section.name, ".rela.dyn")) {
                 self.allocator.free(section.name);
             }
             if (section.relocations) |rela| {

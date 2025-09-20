@@ -37,3 +37,10 @@ pub const DTypes = enum(u32) {
     DT_LOPROC = 0x70000000,
     DT_HIPROC = 0x7fffffff,
 };
+
+const HashTable = struct {
+    nbucket: u32,
+    nchain: u32,
+    buckets: []u32,
+    chains: []u32,
+};
