@@ -3,6 +3,7 @@ const elf = @import("elf");
 const linker = @import("linker.zig");
 const symbols = @import("symbols.zig");
 const got = @import("got.zig");
+const hash = @import("hash.zig");
 
 fn getDynstr(self: *linker.ElfLinker, dynsym: []u8) !struct { []elf.Dynamic, usize } {
     var shared_lib_string = try std.ArrayList(u8).initCapacity(self.allocator, dynsym.len + 1);
@@ -67,7 +68,7 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation) !struct { [2]elf.D
         reloc.set_symbol(self.mutElf.symbols.items.len);
     }
 
-    _ = try buildHashTable(self, try dynsym.toOwnedSlice());
+    _ = try hash.buildHashTable(self, try dynsym.toOwnedSlice());
 
     try self.mutElf.sections.append(.{
         .name = ".dynsym",
@@ -91,69 +92,6 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation) !struct { [2]elf.D
             .un = .{ .val = 0x18 * (dynsym.items.len + 1) },
         },
     }, try dynstr_string.toOwnedSlice() };
-}
-
-fn buildHashTable(self: *linker.ElfLinker, dynsym: []elf.Symbol) ![2]elf.Dynamic {
-    if (dynsym.len == 0) {
-        return [_]elf.Dynamic{
-            .{ .tag = .DT_HASH, .un = .{ .ptr = undefined } },
-            .{ .tag = .DT_NULL, .un = .{ .ptr = 0 } },
-        };
-    }
-
-    const nbucket: u32 = @max(1, @as(u32, @intCast(dynsym.len)));
-    const nchain: u32 = @intCast(dynsym.len);
-
-    var buckets = try self.allocator.alloc(u32, nbucket);
-    defer self.allocator.free(buckets);
-    var chains = try self.allocator.alloc(u32, nchain);
-    defer self.allocator.free(chains);
-
-    @memset(buckets, 0);
-    @memset(chains, 0);
-
-    for (dynsym, 0..) |symbol, i| {
-        if (symbol.name.len == 0) continue;
-
-        const hash = symHash(symbol.name);
-        const bucket_idx = hash % nbucket;
-
-        chains[i] = buckets[bucket_idx];
-        buckets[bucket_idx] = @intCast(i + 1);
-    }
-
-    var hash_data = std.ArrayList(u8).init(self.allocator);
-    defer hash_data.deinit();
-
-    try hash_data.appendSlice(std.mem.asBytes(&nbucket));
-    try hash_data.appendSlice(std.mem.asBytes(&nchain));
-
-    for (buckets) |bucket| {
-        try hash_data.appendSlice(std.mem.asBytes(&bucket));
-    }
-
-    for (chains) |chain| {
-        try hash_data.appendSlice(std.mem.asBytes(&chain));
-    }
-
-    try self.mutElf.sections.append(.{
-        .name = ".hash",
-        .type = .SHT_HASH,
-        .flags = 0b010,
-        .addr = 0,
-        .data = try hash_data.toOwnedSlice(),
-        .link = 0,
-        .info = 0,
-        .addralign = 0x4,
-        .entsize = 4,
-        .relocations = null,
-        .allocator = self.allocator,
-    });
-
-    return [_]elf.Dynamic{
-        .{ .tag = .DT_HASH, .un = .{ .ptr = undefined } },
-        .{ .tag = .DT_NULL, .un = .{ .ptr = 0 } },
-    };
 }
 
 fn buildRelaTable(self: *linker.ElfLinker) !struct { [3]elf.Dynamic, []elf.Relocation } {
@@ -251,18 +189,23 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?[]elf.Dynamic) !void 
     var dynstr: *elf.Section = undefined;
     var dynsym: *elf.Section = undefined;
     var got_plt: *elf.Section = undefined;
+    var hash_section: *elf.Section = undefined;
     var dynstr_ndx: u32 = 0;
+    var dynsym_ndx: u32 = 0;
 
     for (self.mutElf.sections.items, 1..) |*section, i| {
         if (section.type == .SHT_DYNAMIC) {
             dyn_section = section;
         } else if (section.type == .SHT_DYNSYM) {
             dynsym = section;
+            dynsym_ndx = @intCast(i);
         } else if (section.type == .SHT_PROGBITS and std.mem.eql(u8, section.name, ".got.plt")) {
             got_plt = section;
         } else if (std.mem.eql(u8, section.name, ".dynstr")) {
             dynstr = section;
             dynstr_ndx = @intCast(i);
+        } else if (section.type == .SHT_HASH) {
+            hash_section = section;
         }
     }
 
@@ -282,6 +225,7 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?[]elf.Dynamic) !void 
     dynsym.link = dynstr_ndx;
     dyn_section.link = dynstr_ndx;
     dyn_section.data = try dynstr_data.toOwnedSlice();
+    hash_section.link = dynsym_ndx;
 }
 
 fn dynamicToBytes(dyn: elf.Dynamic) [16]u8 {
@@ -290,20 +234,4 @@ fn dynamicToBytes(dyn: elf.Dynamic) [16]u8 {
         .ptr => @as(u128, dyn.un.ptr),
     } << 64;
     return std.mem.asBytes(&raw).*;
-}
-
-// https://en.wikipedia.org/wiki/PJW_hash_function
-fn symHash(name: []const u8) u32 {
-    var hash: u32 = 0;
-    var high: u32 = 0;
-
-    for (name) |c| {
-        hash = (hash << 4) + c;
-        high = hash & 0xf0000000;
-        if (high != 0) {
-            hash ^= high >> 24;
-        }
-        hash &= ~high;
-    }
-    return hash;
 }
