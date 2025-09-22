@@ -11,7 +11,7 @@ pub const Section = struct {
     link: u32,
     info: u32,
     addralign: u64,
-    data: []const u8,
+    data: []u8,
     entsize: u64,
     relocations: ?[]Relocation,
 

@@ -45,7 +45,5 @@ pub fn addGotPltSection(self: *linker.ElfLinker, rela: []elf.Relocation) !void {
 }
 
 pub fn updateGot(_: *linker.ElfLinker, got_plt: *elf.Section, dynamic_ndx: u64) !void {
-    const got_plt_data: *[8]u8 = @constCast(got_plt.data[0..8]);
-
-    std.mem.writeInt(u64, got_plt_data, dynamic_ndx, std.builtin.Endian.little);
+    std.mem.writeInt(u64, got_plt.data[0..8], dynamic_ndx, std.builtin.Endian.little);
 }

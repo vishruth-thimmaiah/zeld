@@ -86,22 +86,17 @@ pub fn applyRelocations(linker: *ElfLinker) !void {
             for (relocations) |*reloc| {
                 const symbol = symbols[reloc.get_symbol()];
 
-                // TODO: try to do this in place
-                const new_data = try linker.mutElf.allocator.dupe(u8, section.data);
-
                 switch (reloc.get_type()) {
                     .R_X86_64_32S => {
                         const value = sum(i32, symbol.value, reloc.addend, 0);
-                        std.mem.writeInt(i32, new_data[reloc.offset..][0..4], value, std.builtin.Endian.little);
+                        std.mem.writeInt(i32, section.data[reloc.offset..][0..4], value, std.builtin.Endian.little);
                     },
                     .R_X86_64_PC32 => {
                         const value = sum(i32, symbol.value, reloc.addend, section.addr + reloc.offset);
-                        std.mem.writeInt(i32, new_data[reloc.offset..][0..4], value, std.builtin.Endian.little);
+                        std.mem.writeInt(i32, section.data[reloc.offset..][0..4], value, std.builtin.Endian.little);
                     },
                     else => undefined,
                 }
-                linker.allocator.free(section.data);
-                section.data = new_data;
             }
         }
     }

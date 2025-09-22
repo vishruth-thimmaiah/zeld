@@ -26,7 +26,7 @@ pub fn mergeSections(linker: *ElfLinker, file: *const elf.Elf64) !std.StringHash
     return section_map;
 }
 
-fn mergeData(linker: *const ElfLinker, main: []const u8, other: []const u8, alignment: u64) ![]const u8 {
+fn mergeData(linker: *const ElfLinker, main: []const u8, other: []const u8, alignment: u64) ![]u8 {
     defer linker.allocator.free(main);
     var concated_data = try linker.allocator.alloc(u8, other.len + alignment);
     @memcpy(concated_data[0..main.len], main);
