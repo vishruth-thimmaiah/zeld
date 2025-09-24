@@ -86,25 +86,94 @@ pub fn applyRelocations(linker: *ElfLinker) !void {
             for (relocations) |*reloc| {
                 const symbol = symbols[reloc.get_symbol()];
 
-                switch (reloc.get_type()) {
-                    .R_X86_64_32S => {
-                        const value = sum(i32, symbol.value, reloc.addend, 0);
-                        std.mem.writeInt(i32, section.data[reloc.offset..][0..4], value, std.builtin.Endian.little);
-                    },
-                    .R_X86_64_PC32 => {
-                        const value = sum(i32, symbol.value, reloc.addend, section.addr + reloc.offset);
-                        std.mem.writeInt(i32, section.data[reloc.offset..][0..4], value, std.builtin.Endian.little);
-                    },
-                    else => undefined,
-                }
+                const rela_data = r: {
+                    switch (reloc.get_type()) {
+                        .R_X86_64_32, .R_X86_64_32S => break :r .{ RelocationType.ABSOLUTE, i32 },
+                        .R_X86_64_PC32 => break :r .{ RelocationType.RELATIVE, i32 },
+                        .R_X86_64_REX_GOTPCRELX => break :r .{ RelocationType.PCREL_RELAXABLE_REX, i32 },
+                        .R_X86_64_GOTPCRELX => break :r .{ RelocationType.PCREL_RELAXABLE, i32 },
+                        else => std.debug.panic("Unsupported relocation type {s}", .{@tagName(reloc.get_type())}),
+                    }
+                };
+                const rela_type = rela_data[0];
+                const rela_size = rela_data[1];
+                const new_addr = rela_type.resolve(rela_size, &symbol, section, reloc);
+                std.mem.writeInt(
+                    rela_size,
+                    section.data[reloc.offset..][0..@sizeOf(rela_size)],
+                    new_addr,
+                    std.builtin.Endian.little,
+                );
             }
         }
     }
 }
 
-// S: symbol.value
-// A: reloc.addend
-// P: reloc.offset
-fn sum(comptime T: type, s: anytype, a: anytype, p: anytype) T {
-    return @as(T, @intCast(s)) + @as(T, @intCast(a)) - @as(T, @intCast(p));
-}
+pub const RelocationType = enum {
+    ABSOLUTE,
+    RELATIVE,
+    PCREL,
+    PCREL_RELAXABLE,
+    PCREL_RELAXABLE_REX,
+    NONE,
+
+    pub var got_idx: *elf.Section = undefined;
+
+    fn resolve(
+        self: RelocationType,
+        T: type,
+        symbol: *const elf.Symbol,
+        section: *const elf.Section,
+        reloc: *elf.Relocation,
+    ) T {
+        switch (self) {
+            .ABSOLUTE => return @as(T, @intCast(symbol.value)) + @as(T, @intCast(reloc.addend)),
+            .RELATIVE => return @as(T, @intCast(symbol.value)) + @as(T, @intCast(reloc.addend)) - @as(T, @intCast(section.addr + reloc.offset)),
+            .PCREL => {
+                const got_addr = got_idx.addr;
+                return @as(T, @intCast(got_addr)) + @as(T, @intCast(reloc.addend)) - @as(T, @intCast(section.addr + reloc.offset));
+            },
+            .PCREL_RELAXABLE => {
+                if (self.try_relax(symbol, reloc, section)) |r| {
+                    return r.resolve(T, symbol, section, reloc);
+                }
+                return RelocationType.PCREL.resolve(T, symbol, section, reloc);
+            },
+            .PCREL_RELAXABLE_REX => {
+                if (self.try_relax(symbol, reloc, section)) |r| {
+                    return r.resolve(T, symbol, section, reloc);
+                }
+                return RelocationType.PCREL.resolve(T, symbol, section, reloc);
+            },
+            .NONE => return 0,
+        }
+        return 0;
+    }
+
+    fn try_relax(self: RelocationType, symbol: *const elf.Symbol, reloc: *elf.Relocation, section: *const elf.Section) ?RelocationType {
+        switch (self) {
+            .PCREL_RELAXABLE_REX => {
+                if (symbol.get_type() == .STT_NOTYPE) return null;
+                if (reloc.offset < 3) return null;
+
+                const rex = section.data[reloc.offset - 3];
+                const op = &section.data[reloc.offset - 2];
+                const modrm = &section.data[reloc.offset - 1];
+
+                if (rex != 0x48) return null;
+                switch (op.*) {
+                    0x8b => {
+                        op.* = 0xc7;
+                        modrm.* = (modrm.* >> 3) & 0x7 | 0xc0;
+                        reloc.addend = 0;
+                        return .ABSOLUTE;
+                    },
+                    else => return null,
+                }
+            },
+            .PCREL_RELAXABLE => return null,
+            else => return null,
+        }
+        return null;
+    }
+};

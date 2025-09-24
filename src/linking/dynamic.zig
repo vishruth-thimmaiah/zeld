@@ -4,6 +4,7 @@ const linker = @import("linker.zig");
 const symbols = @import("symbols.zig");
 const got = @import("got.zig");
 const hash = @import("hash.zig");
+const relocs = @import("relocations.zig");
 
 fn getDynstr(self: *linker.ElfLinker, dynsym: []u8) !struct { []elf.Dynamic, usize } {
     var shared_lib_string = try std.ArrayList(u8).initCapacity(self.allocator, dynsym.len + 1);
@@ -166,7 +167,7 @@ pub fn createDynamicSection(self: *linker.ElfLinker) !?[]elf.Dynamic {
         .type = .SHT_DYNAMIC,
         .flags = 0b011,
         .addr = 0,
-        .data = undefined,
+        .data = try self.allocator.alloc(u8, 0x10 * entries.items.len),
         .link = undefined,
         .info = 0,
         .addralign = 0x1,
@@ -201,6 +202,8 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?[]elf.Dynamic) !void 
             dynsym_ndx = @intCast(i);
         } else if (section.type == .SHT_PROGBITS and std.mem.eql(u8, section.name, ".got.plt")) {
             got_plt = section;
+        } else if (std.mem.eql(u8, section.name, ".got")) {
+            relocs.RelocationType.got_idx = section;
         } else if (std.mem.eql(u8, section.name, ".dynstr")) {
             dynstr = section;
             dynstr_ndx = @intCast(i);
@@ -214,17 +217,16 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?[]elf.Dynamic) !void 
 
     try got.updateGot(self, got_plt, dyn_section.addr);
 
-    for (dyn.?) |*d| {
+    for (dyn.?, 0..) |*d, i| {
         switch (d.tag) {
             .DT_STRTAB => d.un.ptr = dynstr.addr,
             .DT_SYMTAB => d.un.ptr = dynsym.addr,
             else => {},
         }
-        try dynstr_data.appendSlice(&dynamicToBytes(d.*));
+        @memcpy(dyn_section.data[i * 0x10 ..][0..0x10], &dynamicToBytes(d.*));
     }
     dynsym.link = dynstr_ndx;
     dyn_section.link = dynstr_ndx;
-    dyn_section.data = try dynstr_data.toOwnedSlice();
     hash_section.link = dynsym_ndx;
 }
 
