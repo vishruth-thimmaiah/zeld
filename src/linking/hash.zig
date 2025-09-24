@@ -2,12 +2,9 @@ const std = @import("std");
 const elf = @import("elf");
 const linker = @import("linker.zig");
 
-pub fn buildHashTable(self: *linker.ElfLinker, dynsym: []elf.Symbol) ![2]elf.Dynamic {
+pub fn buildHashTable(self: *linker.ElfLinker, dynsym: []elf.Symbol) !elf.Dynamic {
     if (dynsym.len == 0) {
-        return [_]elf.Dynamic{
-            .{ .tag = .DT_HASH, .un = .{ .ptr = undefined } },
-            .{ .tag = .DT_NULL, .un = .{ .ptr = 0 } },
-        };
+        return .{ .tag = .DT_HASH, .un = .{ .ptr = undefined } };
     }
 
     const nchain: u32 = @intCast(dynsym.len + 1);
@@ -59,10 +56,7 @@ pub fn buildHashTable(self: *linker.ElfLinker, dynsym: []elf.Symbol) ![2]elf.Dyn
         .allocator = self.allocator,
     });
 
-    return [_]elf.Dynamic{
-        .{ .tag = .DT_HASH, .un = .{ .ptr = undefined } },
-        .{ .tag = .DT_NULL, .un = .{ .ptr = 0 } },
-    };
+    return .{ .tag = .DT_HASH, .un = .{ .ptr = undefined } };
 }
 
 // https://en.wikipedia.org/wiki/PJW_hash_function

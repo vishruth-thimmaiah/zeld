@@ -49,7 +49,7 @@ fn getDynstr(self: *linker.ElfLinker, dynsym: []u8) !struct { []elf.Dynamic, usi
     return .{ needed, self.mutElf.sections.items.len - 1 };
 }
 
-fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation) !struct { [2]elf.Dynamic, []u8 } {
+fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation) !struct { [3]elf.Dynamic, []u8 } {
     var dynsym = std.ArrayList(elf.Symbol).init(self.allocator);
     defer dynsym.deinit();
 
@@ -69,7 +69,7 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation) !struct { [2]elf.D
         reloc.set_symbol(self.mutElf.symbols.items.len);
     }
 
-    _ = try hash.buildHashTable(self, try dynsym.toOwnedSlice());
+    const hash_info = try hash.buildHashTable(self, try dynsym.toOwnedSlice());
 
     try self.mutElf.sections.append(.{
         .name = ".dynsym",
@@ -92,6 +92,7 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation) !struct { [2]elf.D
             .tag = .DT_SYMENT,
             .un = .{ .val = 0x18 * (dynsym.items.len + 1) },
         },
+        hash_info,
     }, try dynstr_string.toOwnedSlice() };
 }
 
@@ -191,6 +192,7 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?[]elf.Dynamic) !void 
     var dynsym: *elf.Section = undefined;
     var got_plt: *elf.Section = undefined;
     var hash_section: *elf.Section = undefined;
+    var rela_dyn: *elf.Section = undefined;
     var dynstr_ndx: u32 = 0;
     var dynsym_ndx: u32 = 0;
 
@@ -209,6 +211,8 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?[]elf.Dynamic) !void 
             dynstr_ndx = @intCast(i);
         } else if (section.type == .SHT_HASH) {
             hash_section = section;
+        } else if (section.type == .SHT_RELA) {
+            rela_dyn = section;
         }
     }
 
@@ -221,11 +225,14 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?[]elf.Dynamic) !void 
         switch (d.tag) {
             .DT_STRTAB => d.un.ptr = dynstr.addr,
             .DT_SYMTAB => d.un.ptr = dynsym.addr,
+            .DT_RELA => d.un.ptr = rela_dyn.addr,
+            .DT_HASH => d.un.ptr = hash_section.addr,
             else => {},
         }
         @memcpy(dyn_section.data[i * 0x10 ..][0..0x10], &dynamicToBytes(d.*));
     }
     dynsym.link = dynstr_ndx;
+    rela_dyn.link = dynsym_ndx;
     dyn_section.link = dynstr_ndx;
     hash_section.link = dynsym_ndx;
 }
