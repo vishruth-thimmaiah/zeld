@@ -16,7 +16,7 @@ pub const Relocation = struct {
     }
 
     pub fn set_type(self: *Relocation, typeval: RTypes) void {
-        self.info = self.get_symbol() << 32 + @intFromEnum(typeval);
+        self.info = (self.get_symbol() << 32) + @intFromEnum(typeval);
     }
 };
 

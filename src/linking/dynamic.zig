@@ -63,10 +63,10 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation) !struct { [3]elf.D
     for (rela) |*reloc| {
         const symbol = self.mutElf.symbols.items[reloc.get_symbol()];
         try dynsym.append(symbol);
+        reloc.set_symbol(dynsym.items.len);
         symbols.symbolToData(symbol, std.mem.toBytes(@as(u32, @intCast(dynsym.items.len + 1))), null, &dynsym_string) catch unreachable;
         try dynstr_string.appendSlice(symbol.name);
         try dynstr_string.append(0);
-        reloc.set_symbol(self.mutElf.symbols.items.len);
     }
 
     const hash_info = try hash.buildHashTable(self, try dynsym.toOwnedSlice());
@@ -105,21 +105,24 @@ fn buildRelaTable(self: *linker.ElfLinker) !struct { [3]elf.Dynamic, []elf.Reloc
             for (relocations) |reloc| {
                 switch (reloc.get_type()) {
                     .R_X86_64_GOTPCREL, .R_X86_64_GOTPCRELX => {
-                        try dynrela.append(reloc);
+                        var new_reloc = reloc;
+                        new_reloc.set_type(.R_X86_64_GLOB_DAT);
+                        try dynrela.append(new_reloc);
                     },
                     else => {},
                 }
             }
         }
     }
+    const reloc_data: []u8 = try self.allocator.alloc(u8, 0x18 * dynrela.items.len);
 
     try self.mutElf.sections.append(.{
         .name = ".rela.dyn",
         .type = .SHT_RELA,
         .flags = 0b010,
         .addr = 0,
-        .data = try self.allocator.alloc(u8, 0x18 * dynrela.items.len),
-        .link = 0, //TODO
+        .data = reloc_data,
+        .link = 0,
         .info = 0,
         .addralign = 0x8,
         .entsize = 0x18,
@@ -143,7 +146,7 @@ fn buildRelaTable(self: *linker.ElfLinker) !struct { [3]elf.Dynamic, []elf.Reloc
     };
 }
 
-pub fn createDynamicSection(self: *linker.ElfLinker) !?[]elf.Dynamic {
+pub fn createDynamicSection(self: *linker.ElfLinker) !?struct { []elf.Dynamic, []elf.Relocation } {
     if (self.args.dynamic_linker == null) return null;
 
     var entries = std.ArrayList(elf.Dynamic).init(self.allocator);
@@ -180,12 +183,17 @@ pub fn createDynamicSection(self: *linker.ElfLinker) !?[]elf.Dynamic {
 
     try self.mutElf.sections.append(dynamic);
 
-    return try entries.toOwnedSlice();
+    return .{
+        try entries.toOwnedSlice(),
+        rela_info[1],
+    };
 }
 
-pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?[]elf.Dynamic) !void {
+pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynamic, []elf.Relocation }) !void {
     if (dyn == null) return;
-    defer self.allocator.free(dyn.?);
+    const dyn_fields = dyn.?[0];
+    const dyn_relocs = dyn.?[1];
+    defer self.allocator.free(dyn_fields);
 
     var dyn_section: *elf.Section = undefined;
     var dynstr: *elf.Section = undefined;
@@ -220,8 +228,9 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?[]elf.Dynamic) !void 
     defer dynstr_data.deinit();
 
     try got.updateGot(self, got_plt, dyn_section.addr);
+    @memcpy(rela_dyn.data[0 .. 0x18 * dyn_relocs.len], @as([]const u8, @ptrCast(dyn_relocs)));
 
-    for (dyn.?, 0..) |*d, i| {
+    for (dyn_fields, 0..) |*d, i| {
         switch (d.tag) {
             .DT_STRTAB => d.un.ptr = dynstr.addr,
             .DT_SYMTAB => d.un.ptr = dynsym.addr,
