@@ -6,20 +6,16 @@ const got = @import("got.zig");
 const hash = @import("hash.zig");
 const relocs = @import("relocations.zig");
 
-fn getDynstr(self: *linker.ElfLinker, dynsym: []u8) !struct { []elf.Dynamic, usize } {
-    var shared_lib_string = try std.ArrayList(u8).initCapacity(self.allocator, dynsym.len + 1);
-    defer shared_lib_string.deinit();
-    try shared_lib_string.append(0);
-    try shared_lib_string.appendSlice(dynsym);
+fn getDynstr(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct { []elf.Dynamic, usize } {
     var needed = try self.allocator.alloc(elf.Dynamic, self.args.shared_libs.len + 2);
 
     for (self.args.shared_libs, 0..) |lib, i| {
         needed[i] = .{
             .tag = .DT_NEEDED,
-            .un = .{ .val = shared_lib_string.items.len },
+            .un = .{ .val = dynstr.items.len },
         };
-        try shared_lib_string.appendSlice(lib);
-        try shared_lib_string.append(0);
+        try dynstr.appendSlice(lib);
+        try dynstr.append(0);
     }
     needed[needed.len - 2] = .{
         .tag = .DT_STRTAB,
@@ -28,7 +24,7 @@ fn getDynstr(self: *linker.ElfLinker, dynsym: []u8) !struct { []elf.Dynamic, usi
 
     needed[needed.len - 1] = .{
         .tag = .DT_STRSZ,
-        .un = .{ .val = shared_lib_string.items.len },
+        .un = .{ .val = dynstr.items.len },
     };
 
     try self.mutElf.sections.append(.{
@@ -36,7 +32,7 @@ fn getDynstr(self: *linker.ElfLinker, dynsym: []u8) !struct { []elf.Dynamic, usi
         .type = .SHT_STRTAB,
         .flags = 0b010,
         .addr = 0,
-        .data = try shared_lib_string.toOwnedSlice(),
+        .data = try dynstr.toOwnedSlice(),
         .link = 0,
         .info = 0,
         .addralign = 0x1,
@@ -49,12 +45,9 @@ fn getDynstr(self: *linker.ElfLinker, dynsym: []u8) !struct { []elf.Dynamic, usi
     return .{ needed, self.mutElf.sections.items.len - 1 };
 }
 
-fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation) !struct { [3]elf.Dynamic, []u8 } {
+fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation, dynstr: *std.ArrayList(u8)) ![3]elf.Dynamic {
     var dynsym = std.ArrayList(elf.Symbol).init(self.allocator);
     defer dynsym.deinit();
-
-    var dynstr_string = std.ArrayList(u8).init(self.allocator);
-    defer dynstr_string.deinit();
 
     var dynsym_string = try std.ArrayList(u8).initCapacity(self.allocator, 0x18 * (rela.len + 1));
     defer dynsym_string.deinit();
@@ -65,8 +58,8 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation) !struct { [3]elf.D
         try dynsym.append(symbol);
         reloc.set_symbol(dynsym.items.len);
         symbols.symbolToData(symbol, std.mem.toBytes(@as(u32, @intCast(dynsym.items.len + 1))), null, &dynsym_string) catch unreachable;
-        try dynstr_string.appendSlice(symbol.name);
-        try dynstr_string.append(0);
+        try dynstr.appendSlice(symbol.name);
+        try dynstr.append(0);
     }
 
     const hash_info = try hash.buildHashTable(self, try dynsym.toOwnedSlice());
@@ -86,19 +79,21 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation) !struct { [3]elf.D
         .allocator = self.allocator,
     });
 
-    return .{ [_]elf.Dynamic{
+    return [_]elf.Dynamic{
         .{ .tag = .DT_SYMTAB, .un = .{ .ptr = undefined } },
         .{
             .tag = .DT_SYMENT,
             .un = .{ .val = 0x18 * (dynsym.items.len + 1) },
         },
         hash_info,
-    }, try dynstr_string.toOwnedSlice() };
+    };
 }
 
-fn buildRelaTable(self: *linker.ElfLinker) !struct { [3]elf.Dynamic, []elf.Relocation } {
+fn buildRelaTable(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct { [3]elf.Dynamic, []elf.Relocation } {
     var dynrela = std.ArrayList(elf.Relocation).init(self.allocator);
     defer dynrela.deinit();
+
+    _ = dynstr;
 
     for (self.mutElf.sections.items) |*section| {
         if (section.relocations) |relocations| {
@@ -151,13 +146,17 @@ pub fn createDynamicSection(self: *linker.ElfLinker) !?struct { []elf.Dynamic, [
 
     var entries = std.ArrayList(elf.Dynamic).init(self.allocator);
     defer entries.deinit();
+    var dynstr = std.ArrayList(u8).init(self.allocator);
+    defer dynstr.deinit();
+    try dynstr.append(0);
 
-    const rela_info = try buildRelaTable(self);
+    const rela_info = try buildRelaTable(self, &dynstr);
     try entries.appendSlice(&rela_info[0]);
-    const dynsym_info = try getDynsym(self, rela_info[1]);
-    try entries.appendSlice(&dynsym_info[0]);
+    const dynsym_info = try getDynsym(self, rela_info[1], &dynstr);
+    try entries.appendSlice(&dynsym_info);
     try got.addGotSection(self, rela_info[1]);
-    const needed = try getDynstr(self, dynsym_info[1]);
+
+    const needed = try getDynstr(self, &dynstr);
     defer self.allocator.free(needed[0]);
     try entries.appendSlice(needed[0]);
 
