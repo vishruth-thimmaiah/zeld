@@ -8,6 +8,8 @@ const symbolNew = @import("symbols.zig").parse;
 
 const elf = @import("elf");
 
+pub const dynlibs = @import("dynlibs.zig");
+
 pub fn new(allocator: std.mem.Allocator, path: *[]const u8) !elf.Elf64 {
     const file = std.fs.cwd().openFile(path.*, .{}) catch |err| {
         std.debug.print("Error {s}: Failed to open '{s}'\n", .{ @errorName(err), path });
@@ -51,6 +53,8 @@ pub fn new(allocator: std.mem.Allocator, path: *[]const u8) !elf.Elf64 {
         fileHeader,
         sheaders,
         all_sections,
+        &all_sections[symtab_index],
+        &all_sections[all_sections[symtab_index].link],
         symtab_index,
     );
 

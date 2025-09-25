@@ -129,51 +129,40 @@ pub const RelocationType = enum {
         switch (self) {
             .ABSOLUTE => return @as(T, @intCast(symbol.value)) + @as(T, @intCast(reloc.addend)),
             .RELATIVE => return @as(T, @intCast(symbol.value)) + @as(T, @intCast(reloc.addend)) - @as(T, @intCast(section.addr + reloc.offset)),
-            .PCREL => {
-                const got_addr = got_idx.addr;
-                return @as(T, @intCast(got_addr)) + @as(T, @intCast(reloc.addend)) - @as(T, @intCast(section.addr + reloc.offset));
-            },
-            .PCREL_RELAXABLE => {
-                if (self.try_relax(symbol, reloc, section)) |r| {
-                    return r.resolve(T, symbol, section, reloc);
-                }
-                return RelocationType.PCREL.resolve(T, symbol, section, reloc);
-            },
-            .PCREL_RELAXABLE_REX => {
-                if (self.try_relax(symbol, reloc, section)) |r| {
-                    return r.resolve(T, symbol, section, reloc);
-                }
-                return RelocationType.PCREL.resolve(T, symbol, section, reloc);
+            .PCREL, .PCREL_RELAXABLE, .PCREL_RELAXABLE_REX => {
+                const abs = @as(T, @intCast(got_idx.addr)) + @as(T, @intCast(reloc.addend));
+                return abs - @as(T, @intCast(section.addr + reloc.offset));
             },
             .NONE => return 0,
         }
         return 0;
     }
 
-    fn try_relax(self: RelocationType, symbol: *const elf.Symbol, reloc: *elf.Relocation, section: *const elf.Section) ?RelocationType {
+    pub fn try_relax(self: RelocationType, symbol: *const elf.Symbol, reloc: *elf.Relocation, section: *const elf.Section) bool {
         switch (self) {
             .PCREL_RELAXABLE_REX => {
-                if (symbol.get_type() == .STT_NOTYPE) return null;
-                if (reloc.offset < 3) return null;
+                if (symbol.get_type() == .STT_NOTYPE) return false;
+                if (reloc.offset < 3) return false;
 
                 const rex = section.data[reloc.offset - 3];
                 const op = &section.data[reloc.offset - 2];
                 const modrm = &section.data[reloc.offset - 1];
 
-                if (rex != 0x48) return null;
+                if (rex != 0x48) return false;
                 switch (op.*) {
                     0x8b => {
                         op.* = 0xc7;
                         modrm.* = (modrm.* >> 3) & 0x7 | 0xc0;
                         reloc.addend = 0;
-                        return .ABSOLUTE;
+                        reloc.set_type(.R_X86_64_32);
+                        return true;
                     },
-                    else => return null,
+                    else => return false,
                 }
             },
-            .PCREL_RELAXABLE => return null,
-            else => return null,
+            .PCREL_RELAXABLE => return false,
+            else => return false,
         }
-        return null;
+        return false;
     }
 };

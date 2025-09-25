@@ -5,6 +5,7 @@ const symbols = @import("symbols.zig");
 const got = @import("got.zig");
 const hash = @import("hash.zig");
 const relocs = @import("relocations.zig");
+const dynlibs = @import("dynlibs.zig");
 
 fn getDynstr(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct { []elf.Dynamic, usize } {
     var needed = try self.allocator.alloc(elf.Dynamic, self.args.shared_libs.len + 2);
@@ -93,22 +94,33 @@ fn buildRelaTable(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct {
     var dynrela = std.ArrayList(elf.Relocation).init(self.allocator);
     defer dynrela.deinit();
 
+    var dynrela_map = std.StringHashMap(*elf.Symbol).init(self.allocator);
+    defer dynrela_map.deinit();
+
     _ = dynstr;
 
     for (self.mutElf.sections.items) |*section| {
         if (section.relocations) |relocations| {
-            for (relocations) |reloc| {
-                switch (reloc.get_type()) {
-                    .R_X86_64_GOTPCREL, .R_X86_64_GOTPCRELX => {
-                        var new_reloc = reloc;
-                        new_reloc.set_type(.R_X86_64_GLOB_DAT);
-                        try dynrela.append(new_reloc);
-                    },
-                    else => {},
-                }
+            for (relocations) |*reloc| {
+                const reloc_type = r: {
+                    switch (reloc.get_type()) {
+                        .R_X86_64_GOTPCREL => break :r relocs.RelocationType.PCREL_RELAXABLE,
+                        .R_X86_64_GOTPCRELX => break :r relocs.RelocationType.PCREL_RELAXABLE_REX,
+                        .R_X86_64_REX_GOTPCRELX => break :r relocs.RelocationType.PCREL_RELAXABLE_REX,
+                        else => continue,
+                    }
+                };
+                const symbol = &self.mutElf.symbols.items[reloc.get_symbol()];
+                if (reloc_type.try_relax(symbol, reloc, section)) continue;
+                var new_reloc = reloc.*;
+                try dynrela_map.put(symbol.name, symbol);
+                new_reloc.set_type(.R_X86_64_GLOB_DAT);
+                try dynrela.append(new_reloc);
             }
         }
     }
+    try dynlibs.resolve(self, &dynrela_map);
+
     const reloc_data: []u8 = try self.allocator.alloc(u8, 0x18 * dynrela.items.len);
 
     try self.mutElf.sections.append(.{

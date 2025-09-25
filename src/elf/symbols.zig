@@ -19,6 +19,14 @@ pub const Symbol = struct {
         return @enumFromInt(self.info & 0xf);
     }
 
+    pub fn set_bind(self: *Symbol, bind: STBind) void {
+        self.info = (@intFromEnum(bind) << 4) | @intFromEnum(self.get_type());
+    }
+
+    pub fn set_type(self: *Symbol, ty: STType) void {
+        self.info = @intCast((@intFromEnum(self.get_bind()) << 4) | @intFromEnum(ty));
+    }
+
     pub fn getDisplayName(self: Symbol) []const u8 {
         if (self.name.len != 0) {
             return self.name;
@@ -62,7 +70,8 @@ pub const STNdx = union(enum(usize)) {
     SHN_HIRESERVE = 0xffff,
     section: []const u8,
 
-    pub fn fromInt(value: u16, sections: []Section) STNdx {
+    pub fn fromInt(value: u16, sections: ?[]Section) STNdx {
+        if (sections == null) return STNdx.SHN_UNDEF;
         return switch (value) {
             0 => STNdx.SHN_UNDEF,
             0xff00 => STNdx.SHN_LOPROC,
@@ -70,7 +79,7 @@ pub const STNdx = union(enum(usize)) {
             0xfff1 => STNdx.SHN_ABS,
             0xfff2 => STNdx.SHN_COMMON,
             0xffff => STNdx.SHN_HIRESERVE,
-            else => STNdx{ .section = sections[value - 1].name },
+            else => STNdx{ .section = sections.?[value - 1].name },
         };
     }
 

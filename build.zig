@@ -34,6 +34,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = .{ .cwd_relative = "src/linking/linker.zig" },
     });
     linker.addImport("elf", elf);
+    linker.addImport("parser", parser);
 
     const writer = b.addModule("writer", .{
         .target = target,
