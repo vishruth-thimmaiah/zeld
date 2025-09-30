@@ -10,7 +10,7 @@ pub const Dynlib = struct {
     path: []const u8,
     header: elf.Header,
     dynsym: []elf.Symbol,
-    dynstr: *const elf.Section,
+    dynstr: elf.Section,
 
     allocator: std.mem.Allocator,
 
@@ -38,6 +38,7 @@ pub const Dynlib = struct {
         };
 
         var symtab: elf.Section = undefined;
+        defer symtab.deinit();
         var symtab_index: usize = undefined;
 
         for (sheaders, 0..) |*sh, i| {
@@ -45,7 +46,7 @@ pub const Dynlib = struct {
                 symtab = (try section.parseSection(allocator, filebuffer, sh, null)).?;
                 symtab_index = i;
             } else if (sh.type == .SHT_STRTAB and sh.flags != 0) {
-                dynlib.dynstr = &(try section.parseSection(allocator, filebuffer, sh, null)).?;
+                dynlib.dynstr = (try section.parseSection(allocator, filebuffer, sh, null)).?;
             }
         }
         dynlib.dynsym = try symbol.parse(
@@ -54,7 +55,7 @@ pub const Dynlib = struct {
             sheaders,
             null,
             &symtab,
-            dynlib.dynstr,
+            &dynlib.dynstr,
             symtab_index,
         );
 
@@ -69,9 +70,9 @@ pub const Dynlib = struct {
         }
     }
 
-    pub fn deinit(self: *const Dynlib) void {
+    pub fn deinit(self: *Dynlib) void {
         for (self.dynsym) |sym| sym.deinit();
         self.allocator.free(self.dynsym);
-        // self.dynstr.deinit();
+        self.dynstr.deinit();
     }
 };

@@ -19,7 +19,9 @@ pub fn mergeSections(linker: *ElfLinker, file: *const elf.Elf64) !std.StringHash
         } else {
             try sections.append(section.*);
             // FIXME: temporary solution for double free when appending a section
-            sections.items[sections.items.len - 1].data = try linker.allocator.dupe(u8, section.data);
+            const last = &sections.items[sections.items.len - 1];
+            last.data = try linker.allocator.dupe(u8, section.data);
+            if (last.relocations) |r| last.relocations = try linker.allocator.dupe(elf.Relocation, r);
             try section_map.put(section.name, linker.mutElf.sections.items.len - 1);
         }
     }
@@ -43,8 +45,8 @@ fn mergeRelas(
 ) !?[]elf.Relocation {
     if (main == null and other == null) return null;
 
-    if (other) |_| {
-        for (other.?) |*rela| {
+    if (other) |o| {
+        for (o) |*rela| {
             rela.offset += alignment;
         }
     }

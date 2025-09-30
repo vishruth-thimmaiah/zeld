@@ -57,6 +57,8 @@ pub fn new(allocator: std.mem.Allocator, path: *[]const u8) !elf.Elf64 {
         &all_sections[all_sections[symtab_index].link],
         symtab_index,
     );
+    all_sections[symtab_index].deinit();
+    all_sections[all_sections[symtab_index].link].deinit();
 
     for (rela_indexes.items) |rela_index| {
         const rela_section = all_sections[rela_index[0]];

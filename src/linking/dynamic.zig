@@ -47,23 +47,23 @@ fn getDynstr(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct { []el
 }
 
 fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation, dynstr: *std.ArrayList(u8)) ![3]elf.Dynamic {
-    var dynsym = std.ArrayList(elf.Symbol).init(self.allocator);
-    defer dynsym.deinit();
+    var dynsym = try self.allocator.alloc(elf.Symbol, rela.len);
+    defer self.allocator.free(dynsym);
 
     var dynsym_string = try std.ArrayList(u8).initCapacity(self.allocator, 0x18 * (rela.len + 1));
     defer dynsym_string.deinit();
     try dynsym_string.appendNTimes(0, 0x18);
 
-    for (rela) |*reloc| {
+    for (rela, 0..) |*reloc, i| {
         const symbol = self.mutElf.symbols.items[reloc.get_symbol()];
-        try dynsym.append(symbol);
-        reloc.set_symbol(dynsym.items.len);
-        symbols.symbolToData(symbol, std.mem.toBytes(@as(u32, @intCast(dynsym.items.len))), null, &dynsym_string) catch unreachable;
+        dynsym[i] = symbol;
+        reloc.set_symbol(dynsym.len);
+        try symbols.symbolToData(symbol, std.mem.toBytes(@as(u32, @intCast(dynsym.len))), null, &dynsym_string);
         try dynstr.appendSlice(symbol.name);
         try dynstr.append(0);
     }
 
-    const hash_info = try hash.buildHashTable(self, try dynsym.toOwnedSlice());
+    const hash_info = try hash.buildHashTable(self, dynsym);
 
     try self.mutElf.sections.append(.{
         .name = ".dynsym",
@@ -72,7 +72,7 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation, dynstr: *std.Array
         .addr = 0,
         .data = try dynsym_string.toOwnedSlice(),
         .link = 0,
-        .info = @intCast(dynsym.items.len + 1),
+        .info = @intCast(dynsym.len + 1),
         .addralign = 0x1,
         .entsize = 0x18,
         .relocations = null,
@@ -84,7 +84,7 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation, dynstr: *std.Array
         .{ .tag = .DT_SYMTAB, .un = .{ .ptr = undefined } },
         .{
             .tag = .DT_SYMENT,
-            .un = .{ .val = 0x18 * (dynsym.items.len + 1) },
+            .un = .{ .val = 0x18 * (dynsym.len + 1) },
         },
         hash_info,
     };
@@ -205,6 +205,7 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynami
     const dyn_fields = dyn.?[0];
     const dyn_relocs = dyn.?[1];
     defer self.allocator.free(dyn_fields);
+    defer  self.allocator.free(dyn_relocs);
 
     var dyn_section: *elf.Section = undefined;
     var dynstr: *elf.Section = undefined;

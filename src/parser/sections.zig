@@ -10,14 +10,13 @@ pub fn parse(
 ) ![]elf.Section {
     const string_section = sheaders[header.shstrndx];
 
-    var sections = try std.ArrayList(elf.Section).initCapacity(allocator, sheaders.len);
-    defer sections.deinit();
-    for (sheaders) |*sheader| {
+    var sections = try allocator.alloc(elf.Section, sheaders.len);
+    for (sheaders, 0..) |*sheader, i| {
         if (try parseSection(allocator, bytes, sheader, &string_section)) |section| {
-            try sections.append(section);
+            sections[i] = section;
         }
     }
-    return sections.toOwnedSlice();
+    return sections;
 }
 
 pub fn parseSection(
