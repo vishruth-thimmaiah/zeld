@@ -58,7 +58,7 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation, dynstr: *std.Array
         const symbol = self.mutElf.symbols.items[reloc.get_symbol()];
         try dynsym.append(symbol);
         reloc.set_symbol(dynsym.items.len);
-        symbols.symbolToData(symbol, std.mem.toBytes(@as(u32, @intCast(dynsym.items.len + 1))), null, &dynsym_string) catch unreachable;
+        symbols.symbolToData(symbol, std.mem.toBytes(@as(u32, @intCast(dynsym.items.len))), null, &dynsym_string) catch unreachable;
         try dynstr.appendSlice(symbol.name);
         try dynstr.append(0);
     }
@@ -212,6 +212,7 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynami
     var got_plt: *elf.Section = undefined;
     var hash_section: *elf.Section = undefined;
     var rela_dyn: *elf.Section = undefined;
+    var got_s: *elf.Section = undefined;
     var dynstr_ndx: u32 = 0;
     var dynsym_ndx: u32 = 0;
 
@@ -224,6 +225,7 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynami
         } else if (section.type == .SHT_PROGBITS and std.mem.eql(u8, section.name, ".got.plt")) {
             got_plt = section;
         } else if (std.mem.eql(u8, section.name, ".got")) {
+            got_s = section;
             relocs.RelocationType.got_idx = section;
         } else if (std.mem.eql(u8, section.name, ".dynstr")) {
             dynstr = section;
@@ -239,6 +241,9 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynami
     defer dynstr_data.deinit();
 
     try got.updateGot(self, got_plt, dyn_section.addr);
+    for (dyn_relocs, 0..) |*r, i| {
+        r.offset = got_s.addr + 0x8 * i;
+    }
     @memcpy(rela_dyn.data[0 .. 0x18 * dyn_relocs.len], @as([]const u8, @ptrCast(dyn_relocs)));
 
     for (dyn_fields, 0..) |*d, i| {
