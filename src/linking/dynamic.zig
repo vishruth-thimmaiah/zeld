@@ -57,8 +57,9 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation, dynstr: *std.Array
     for (rela, 0..) |*reloc, i| {
         const symbol = self.mutElf.symbols.items[reloc.get_symbol()];
         dynsym[i] = symbol;
-        reloc.set_symbol(dynsym.len);
-        try symbols.symbolToData(symbol, std.mem.toBytes(@as(u32, @intCast(dynsym.len))), null, &dynsym_string);
+        reloc.set_symbol(i + 1);
+        reloc.addend = 0;
+        try symbols.symbolToData(symbol, std.mem.toBytes(@as(u32, @intCast(dynstr.items.len))), null, &dynsym_string);
         try dynstr.appendSlice(symbol.name);
         try dynstr.append(0);
     }
@@ -90,7 +91,7 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation, dynstr: *std.Array
     };
 }
 
-fn buildRelaTable(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct { [3]elf.Dynamic, []elf.Relocation } {
+fn buildRelaTable(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct { [3]elf.Dynamic, []elf.Relocation, usize } {
     var dynrela = std.ArrayList(elf.Relocation).init(self.allocator);
     defer dynrela.deinit();
 
@@ -99,22 +100,30 @@ fn buildRelaTable(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct {
 
     _ = dynstr;
 
+    var plt_count: usize = 0;
+
     for (self.mutElf.sections.items) |*section| {
         if (section.relocations) |relocations| {
             for (relocations) |*reloc| {
-                const reloc_type = r: {
+                const r: struct { relocs.RelocationType, elf.RTypes } = r: {
                     switch (reloc.get_type()) {
-                        .R_X86_64_GOTPCREL => break :r relocs.RelocationType.PCREL_RELAXABLE,
-                        .R_X86_64_GOTPCRELX => break :r relocs.RelocationType.PCREL_RELAXABLE_REX,
-                        .R_X86_64_REX_GOTPCRELX => break :r relocs.RelocationType.PCREL_RELAXABLE_REX,
+                        .R_X86_64_GOTPCREL => break :r .{ relocs.RelocationType.PCREL_RELAXABLE, .R_X86_64_GLOB_DAT },
+                        .R_X86_64_GOTPCRELX => break :r .{ relocs.RelocationType.PCREL_RELAXABLE_REX, .R_X86_64_GLOB_DAT },
+                        .R_X86_64_REX_GOTPCRELX => break :r .{ relocs.RelocationType.PCREL_RELAXABLE_REX, .R_X86_64_GLOB_DAT },
+                        .R_X86_64_PLT32 => {
+                            plt_count += 1;
+                            break :r .{ relocs.RelocationType.PLT, .R_X86_64_GLOB_DAT };
+                        },
                         else => continue,
                     }
                 };
+                const reloc_type = r[0];
+                const reloc_cat = r[1];
                 const symbol = &self.mutElf.symbols.items[reloc.get_symbol()];
                 if (reloc_type.try_relax(symbol, reloc, section)) continue;
                 var new_reloc = reloc.*;
                 try dynrela_map.put(symbol.name, symbol);
-                new_reloc.set_type(.R_X86_64_GLOB_DAT);
+                new_reloc.set_type(reloc_cat);
                 try dynrela.append(new_reloc);
             }
         }
@@ -150,6 +159,7 @@ fn buildRelaTable(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct {
             .un = .{ .val = 0x18 },
         } },
         try dynrela.toOwnedSlice(),
+        plt_count,
     };
 }
 
@@ -166,7 +176,9 @@ pub fn createDynamicSection(self: *linker.ElfLinker) !?struct { []elf.Dynamic, [
     try entries.appendSlice(&rela_info[0]);
     const dynsym_info = try getDynsym(self, rela_info[1], &dynstr);
     try entries.appendSlice(&dynsym_info);
-    try got.addGotSection(self, rela_info[1]);
+    const plt_info = try got.addPltSection(self, rela_info[2]);
+    try entries.append(plt_info);
+    try got.addGotSection(self, rela_info[1], rela_info[2]);
 
     const needed = try getDynstr(self, &dynstr);
     defer self.allocator.free(needed[0]);
@@ -205,7 +217,7 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynami
     const dyn_fields = dyn.?[0];
     const dyn_relocs = dyn.?[1];
     defer self.allocator.free(dyn_fields);
-    defer  self.allocator.free(dyn_relocs);
+    defer self.allocator.free(dyn_relocs);
 
     var dyn_section: *elf.Section = undefined;
     var dynstr: *elf.Section = undefined;
@@ -214,6 +226,7 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynami
     var hash_section: *elf.Section = undefined;
     var rela_dyn: *elf.Section = undefined;
     var got_s: *elf.Section = undefined;
+    var plt: *elf.Section = undefined;
     var dynstr_ndx: u32 = 0;
     var dynsym_ndx: u32 = 0;
 
@@ -228,6 +241,9 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynami
         } else if (std.mem.eql(u8, section.name, ".got")) {
             got_s = section;
             relocs.RelocationType.got_idx = section;
+        } else if (std.mem.eql(u8, section.name, ".plt")) {
+            plt = section;
+            relocs.RelocationType.plt_idx = section;
         } else if (std.mem.eql(u8, section.name, ".dynstr")) {
             dynstr = section;
             dynstr_ndx = @intCast(i);
@@ -253,6 +269,7 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynami
             .DT_SYMTAB => d.un.ptr = dynsym.addr,
             .DT_RELA => d.un.ptr = rela_dyn.addr,
             .DT_HASH => d.un.ptr = hash_section.addr,
+            .DT_PLTGOT => d.un.ptr = plt.addr,
             else => {},
         }
         @memcpy(dyn_section.data[i * 0x10 ..][0..0x10], &dynamicToBytes(d.*));

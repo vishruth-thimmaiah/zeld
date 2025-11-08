@@ -15,6 +15,7 @@ pub const SHType = @import("header.zig").SHType;
 pub const Section = @import("sections.zig").Section;
 
 pub const Relocation = @import("relocations.zig").Relocation;
+pub const RTypes = @import("relocations.zig").RTypes;
 
 pub const Symbol = @import("symbols.zig").Symbol;
 pub const STBind = @import("symbols.zig").STBind;
