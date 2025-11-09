@@ -17,7 +17,7 @@ pub fn parse(allocator: std.mem.Allocator, bytes: []const u8) !elf.Header {
         .version = bytes[6],
         .osabi = bytes[7],
         .abiversion = bytes[8],
-        .type = utils.readInt(elf.EType, bytes, 16, endian),
+        .type = utils.readInt(elf.Header.Type, bytes, 16, endian),
         .machine = utils.readInt(u16, bytes, 18, endian),
         .file_version = utils.readInt(u32, bytes, 20, endian),
         .entry = utils.readInt(u64, bytes, 24, endian),

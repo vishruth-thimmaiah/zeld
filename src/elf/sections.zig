@@ -1,11 +1,11 @@
 const std = @import("std");
 
-const SectionHeader = @import("header.zig");
+const SectionHeader = @import("header.zig").SectionHeader;
 const Relocation = @import("relocations.zig").Relocation;
 
 pub const Section = struct {
     name: []const u8,
-    type: SectionHeader.SHType,
+    type: SectionHeader.Type,
     flags: u64,
     addr: u64,
     link: u32,

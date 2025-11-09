@@ -11,7 +11,7 @@ const buildSHeaders = @import("sheaders.zig").buildSHeaders;
 const MutElf64 = @import("mutelf.zig").MutElf64;
 
 pub const LinkerArgs = struct {
-    output_type: elf.EType,
+    output_type: elf.Header.Type,
     dynamic_linker: ?[]const u8,
     shared_libs: [][]const u8,
 };

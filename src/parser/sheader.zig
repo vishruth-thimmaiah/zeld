@@ -20,7 +20,7 @@ pub fn parse(allocator: std.mem.Allocator, bytes: []const u8, fheader: elf.Heade
         }
         const header = elf.SectionHeader{
             .name = utils.readInt(u32, bytes, offset, endian),
-            .type = utils.readInt(elf.SHType, bytes, offset + 4, endian),
+            .type = utils.readInt(elf.SectionHeader.Type, bytes, offset + 4, endian),
             .flags = utils.readInt(u64, bytes, offset + 8, endian),
             .addr = utils.readInt(u64, bytes, offset + 16, endian),
             .offset = utils.readInt(u64, bytes, offset + 24, endian),

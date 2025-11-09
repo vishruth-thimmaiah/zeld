@@ -5,17 +5,17 @@ const ElfLinker = @import("linker.zig").ElfLinker;
 const SegmentArray = std.ArrayList(Segment);
 
 const Segment = union(enum) {
-    SEGMENT_START: struct { elf.PHType, u32, u64, u64 },
+    SEGMENT_START: struct { elf.ProgramHeader.Type, u32, u64, u64 },
     SEGMENT_END,
     SECTION: *elf.Section,
 
-    fn addSingleSegment(segments: *SegmentArray, section: *elf.Section, offset: u64, type_: elf.PHType, flags: u32, align_: u64) !void {
+    fn addSingleSegment(segments: *SegmentArray, section: *elf.Section, offset: u64, type_: elf.ProgramHeader.Type, flags: u32, align_: u64) !void {
         try segments.append(.{ .SEGMENT_START = .{ type_, flags, align_, offset } });
         try segments.append(.{ .SECTION = section });
         try segments.append(.SEGMENT_END);
     }
 
-    fn prependSingleSegment(segments: *SegmentArray, section: *elf.Section, offset: u64, type_: elf.PHType, flags: u32, align_: u64) !void {
+    fn prependSingleSegment(segments: *SegmentArray, section: *elf.Section, offset: u64, type_: elf.ProgramHeader.Type, flags: u32, align_: u64) !void {
         try segments.insert(0, .{ .SEGMENT_START = .{ type_, flags, align_, offset } });
         try segments.insert(1, .{ .SECTION = section });
         try segments.insert(2, .SEGMENT_END);
@@ -148,7 +148,7 @@ pub fn generatePheaders(linker: *ElfLinker) !void {
 fn generatePHDR(segment_count: u32) elf.ProgramHeader {
     const sizeof = (segment_count) * @sizeOf(elf.ProgramHeader);
     const phdr = elf.ProgramHeader{
-        .type = elf.PHType.PT_PHDR,
+        .type = elf.ProgramHeader.Type.PT_PHDR,
         .flags = 0b100,
         .offset = 0x40,
         .vaddr = elf.START_ADDR | 0x40,

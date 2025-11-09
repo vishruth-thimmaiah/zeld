@@ -25,7 +25,7 @@ pub fn parse(
             .name = try allocator.dupe(u8, getSymbolName(name_offset, strtab.data)),
             .info = utils.readInt(u8, symtab.data, offset + 4, header.data),
             .other = utils.readInt(u8, symtab.data, offset + 5, header.data),
-            .shndx = elf.STNdx.fromInt(shndx, sections),
+            .shndx = elf.Symbol.Ndx.fromInt(shndx, sections),
             .value = utils.readInt(u64, symtab.data, offset + 8, header.data),
             .size = utils.readInt(u64, symtab.data, offset + 16, header.data),
 

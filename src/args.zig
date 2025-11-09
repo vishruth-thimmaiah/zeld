@@ -83,7 +83,7 @@ fn streql(arg: []const u8, short: ?[]const u8, long: []const u8) bool {
     return std.mem.eql(u8, arg, long);
 }
 
-fn classify_file(path: []const u8) !elf.EType {
+fn classify_file(path: []const u8) !elf.Header.Type {
     var buffer: [18]u8 = undefined;
     const data = try std.fs.cwd().readFile(path, &(&buffer).*);
     if (!std.mem.eql(u8, data[0..4], &elf.MAGIC_BYTES)) {

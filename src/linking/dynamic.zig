@@ -105,7 +105,7 @@ fn buildRelaTable(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct {
     for (self.mutElf.sections.items) |*section| {
         if (section.relocations) |relocations| {
             for (relocations) |*reloc| {
-                const r: struct { relocs.RelocationType, elf.RTypes } = r: {
+                const r: struct { relocs.RelocationType, elf.Relocation.Types } = r: {
                     switch (reloc.get_type()) {
                         .R_X86_64_GOTPCREL => break :r .{ relocs.RelocationType.PCREL_RELAXABLE, .R_X86_64_GLOB_DAT },
                         .R_X86_64_GOTPCRELX => break :r .{ relocs.RelocationType.PCREL_RELAXABLE_REX, .R_X86_64_GLOB_DAT },
