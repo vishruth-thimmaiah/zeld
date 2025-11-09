@@ -20,32 +20,6 @@ pub fn addGotSection(self: *linker.ElfLinker, rela: []elf.Relocation, plt_size: 
 
         .allocator = self.allocator,
     });
-
-    try addGotPltSection(self, rela);
-}
-
-pub fn addGotPltSection(self: *linker.ElfLinker, rela: []elf.Relocation) !void {
-    var gotPlt = try self.allocator.alloc(u8, 0x8 * (rela.len + 2));
-    @memset(gotPlt[0x8..], 0);
-
-    try self.mutElf.sections.append(.{
-        .name = ".got.plt",
-        .type = .SHT_PROGBITS,
-        .flags = 0b011,
-        .addr = 0,
-        .data = gotPlt,
-        .link = 0,
-        .info = 0,
-        .addralign = 0x8,
-        .entsize = 0x10,
-        .relocations = null,
-
-        .allocator = self.allocator,
-    });
-}
-
-pub fn updateGot(_: *linker.ElfLinker, got_plt: *elf.Section, dynamic_ndx: u64) !void {
-    std.mem.writeInt(u64, got_plt.data[0..8], dynamic_ndx, std.builtin.Endian.little);
 }
 
 pub fn addPltSection(self: *linker.ElfLinker, plt_count: usize) !elf.Dynamic {

@@ -222,7 +222,6 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynami
     var dyn_section: *elf.Section = undefined;
     var dynstr: *elf.Section = undefined;
     var dynsym: *elf.Section = undefined;
-    var got_plt: *elf.Section = undefined;
     var hash_section: *elf.Section = undefined;
     var rela_dyn: *elf.Section = undefined;
     var got_s: *elf.Section = undefined;
@@ -236,8 +235,6 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynami
         } else if (section.type == .SHT_DYNSYM) {
             dynsym = section;
             dynsym_ndx = @intCast(i);
-        } else if (section.type == .SHT_PROGBITS and std.mem.eql(u8, section.name, ".got.plt")) {
-            got_plt = section;
         } else if (std.mem.eql(u8, section.name, ".got")) {
             got_s = section;
             relocs.RelocationType.got_idx = section;
@@ -257,7 +254,6 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynami
     var dynstr_data = std.ArrayList(u8).init(self.allocator);
     defer dynstr_data.deinit();
 
-    try got.updateGot(self, got_plt, dyn_section.addr);
     for (dyn_relocs, 0..) |*r, i| {
         r.offset = got_s.addr + 0x8 * i;
     }
