@@ -14,6 +14,7 @@ pub fn handleError(e: anyerror) noreturn {
     switch (e) {
         error.MissingInput => err("Missing input files", .{}),
         error.MissingTarget => err("Missing target", .{}),
+        error.NotElf => err("File is not an ELF file", .{}),
         else => |_| {
             err("Unknown error: {}", .{e});
             @errorReturnTrace();
