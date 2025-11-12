@@ -178,7 +178,7 @@ pub fn createDynamicSection(self: *linker.ElfLinker) !?struct { []elf.Dynamic, [
     try entries.appendSlice(&dynsym_info);
     const plt_info = try got.addPltSection(self, rela_info[2]);
     try entries.append(plt_info);
-    try got.addGotSection(self, rela_info[1], rela_info[2]);
+    try got.addGotSection(self, rela_info[1]);
 
     const needed = try getDynstr(self, &dynstr);
     defer self.allocator.free(needed[0]);

@@ -149,7 +149,7 @@ pub const RelocationType = enum {
                 @memcpy(plt_data[plt_count * 0x10 ..][0x4..0x7], BND_JMP[0..]);
                 @memcpy(plt_data[plt_count * 0x10 ..][0xb..0x10], NOPL[0..]);
 
-                const offset = @as(T, @intCast(got_idx.addr + got_count * 0x8)) - @as(T, @intCast(plt_idx.addr + plt_count * 0x8 + 0xb));
+                const offset = @as(T, @intCast(got_idx.addr + got_count * 0x8)) - @as(T, @intCast(plt_idx.addr + plt_count * 0x10 + 0xb));
                 std.mem.writeInt(
                     T,
                     plt_data[plt_count * 0x10 ..][0x7..0xb],
@@ -157,9 +157,10 @@ pub const RelocationType = enum {
                     std.builtin.Endian.little,
                 );
 
+                const plt = @as(T, @intCast(plt_idx.addr + plt_count * 0x10)) + @as(T, @intCast(reloc.addend));
+
                 got_count += 1;
                 plt_count += 1;
-                const plt = @as(T, @intCast(plt_idx.addr)) + @as(T, @intCast(reloc.addend));
 
                 return plt - @as(T, @intCast(section.addr + reloc.offset));
             },

@@ -2,8 +2,8 @@ const std = @import("std");
 const elf = @import("elf");
 const linker = @import("linker.zig");
 
-pub fn addGotSection(self: *linker.ElfLinker, rela: []elf.Relocation, plt_size: usize) !void {
-    const got = try self.allocator.alloc(u8, 0x8 * (rela.len + plt_size));
+pub fn addGotSection(self: *linker.ElfLinker, rela: []elf.Relocation) !void {
+    const got = try self.allocator.alloc(u8, 0x8 * rela.len);
     @memset(got, 0);
 
     try self.mutElf.sections.append(.{
