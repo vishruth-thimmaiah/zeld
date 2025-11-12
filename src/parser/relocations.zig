@@ -5,7 +5,7 @@ const elf = @import("elf");
 
 pub fn parse(allocator: std.mem.Allocator, header: elf.Header, section: elf.Section) ![]elf.Relocation {
     var relocations = try std.ArrayList(elf.Relocation).initCapacity(allocator, section.data.len / 24);
-    defer relocations.deinit();
+    defer relocations.deinit(allocator);
 
     for (0..section.data.len / section.entsize) |i| {
         const offset = i * section.entsize;
@@ -14,9 +14,9 @@ pub fn parse(allocator: std.mem.Allocator, header: elf.Header, section: elf.Sect
             .info = utils.readInt(u64, section.data, offset + 8, header.data),
             .addend = utils.readInt(i64, section.data, offset + 16, header.data),
         };
-        try relocations.append(rela);
+        try relocations.append(allocator, rela);
     }
-    return try relocations.toOwnedSlice();
+    return try relocations.toOwnedSlice(allocator);
 }
 
 pub fn updateSection(allocator: std.mem.Allocator, header: elf.Header, section: *elf.Section, rela_section: elf.Section) !void {

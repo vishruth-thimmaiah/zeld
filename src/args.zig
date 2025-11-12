@@ -14,11 +14,11 @@ pub const Args = struct {
         var args = try std.process.argsWithAllocator(allocator);
         defer args.deinit();
 
-        var rel_inputs = std.ArrayList([]const u8).init(allocator);
-        defer rel_inputs.deinit();
+        var rel_inputs: std.ArrayList([]const u8) = .empty;
+        defer rel_inputs.deinit(allocator);
 
-        var dyn_inputs = std.ArrayList([]const u8).init(allocator);
-        defer dyn_inputs.deinit();
+        var dyn_inputs: std.ArrayList([]const u8) = .empty;
+        defer dyn_inputs.deinit(allocator);
 
         var results: Args = .{
             .rel_inputs = undefined,
@@ -51,8 +51,8 @@ pub const Args = struct {
                 return error.MissingInput;
             } else if (next[0] != '-') {
                 switch (try classify_file(next)) {
-                    .ET_REL => try rel_inputs.append(next),
-                    .ET_DYN => try dyn_inputs.append(next),
+                    .ET_REL => try rel_inputs.append(allocator, next),
+                    .ET_DYN => try dyn_inputs.append(allocator, next),
                     else => return error.UnsupportedFileType,
                 }
             } else {
@@ -64,8 +64,8 @@ pub const Args = struct {
             return error.MissingInput;
         }
 
-        results.rel_inputs = try rel_inputs.toOwnedSlice();
-        results.linker_args.shared_libs = try dyn_inputs.toOwnedSlice();
+        results.rel_inputs = try rel_inputs.toOwnedSlice(allocator);
+        results.linker_args.shared_libs = try dyn_inputs.toOwnedSlice(allocator);
 
         return results;
     }
@@ -85,7 +85,7 @@ fn streql(arg: []const u8, short: ?[]const u8, long: []const u8) bool {
 
 fn classify_file(path: []const u8) !elf.Header.Type {
     var buffer: [18]u8 = undefined;
-    const data = try std.fs.cwd().readFile(path, &(&buffer).*);
+    const data = try std.fs.cwd().readFile(path, &buffer);
     if (!std.mem.eql(u8, data[0..4], &elf.MAGIC_BYTES)) {
         return error.NotElf;
     }

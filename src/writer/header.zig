@@ -1,14 +1,14 @@
 const std = @import("std");
 const elf = @import("elf");
 
-pub fn writeHeader(writer: std.fs.File.Writer, header: elf.Header) !void {
+pub fn writeHeader(writer: anytype, header: elf.Header) !void {
     try writer.writeAll(&elf.MAGIC_BYTES);
     try writer.writeByte(header.class);
     try writer.writeByte(if (header.data == std.builtin.Endian.little) 1 else 2);
     try writer.writeByte(header.version);
     try writer.writeByte(header.osabi);
     try writer.writeByte(header.abiversion);
-    try writer.writeByteNTimes(0, 16 - 9);
+    _ = try writer.splatByte(0, 16 - 9);
     try writer.writeInt(u16, @intFromEnum(header.type), header.data);
     try writer.writeInt(u16, header.machine, header.data);
     try writer.writeInt(u32, header.file_version, header.data);

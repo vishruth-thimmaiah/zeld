@@ -3,7 +3,7 @@ const elf = @import("elf");
 
 const little = std.builtin.Endian.little;
 
-pub fn writePHeader(file: std.fs.File.Writer, pheaders: []elf.ProgramHeader) !void {
+pub fn writePHeader(file: *std.io.Writer, pheaders: []elf.ProgramHeader) !void {
     for (pheaders) |sheader| {
         try file.writeInt(u32, @intFromEnum(sheader.type), little);
         try file.writeInt(u32, sheader.flags, little);

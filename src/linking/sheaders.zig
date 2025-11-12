@@ -7,13 +7,13 @@ pub fn buildSHeaders(
     linker: *ElfLinker,
     shstrtab_names: std.StringHashMap(u32),
 ) ![]elf.SectionHeader {
-    var sheaders = std.ArrayList(elf.SectionHeader).init(linker.allocator);
-    defer sheaders.deinit();
+    var sheaders: std.ArrayList(elf.SectionHeader) = .empty;
+    defer sheaders.deinit(linker.allocator);
 
     const header = &linker.mutElf.header;
     const sections = linker.mutElf.sections.items;
 
-    try sheaders.append(std.mem.zeroes(elf.SectionHeader));
+    try sheaders.append(linker.allocator, std.mem.zeroes(elf.SectionHeader));
 
     var offset: usize = 64 + header.phnum * header.phentsize;
 
@@ -30,9 +30,9 @@ pub fn buildSHeaders(
             .addralign = section.addralign,
             .entsize = section.entsize,
         };
-        try sheaders.append(sheader);
+        try sheaders.append(linker.allocator, sheader);
         offset += section.data.len;
     }
 
-    return sheaders.toOwnedSlice();
+    return try sheaders.toOwnedSlice(linker.allocator);
 }

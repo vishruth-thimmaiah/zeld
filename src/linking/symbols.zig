@@ -7,8 +7,8 @@ pub fn mergeSymbols(linker: *ElfLinker, file: *const elf.Elf64, section_map: std
     defer symbol_map.deinit();
 
     // Keep track of original global symbols
-    var original_symbols = std.ArrayList([]const u8).init(linker.allocator);
-    defer original_symbols.deinit();
+    var original_symbols: std.ArrayList([]const u8) = .empty;
+    defer original_symbols.deinit(linker.allocator);
 
     // Globals come after local symbols
     var global_ptr: usize = 0;
@@ -16,7 +16,7 @@ pub fn mergeSymbols(linker: *ElfLinker, file: *const elf.Elf64, section_map: std
     for (linker.mutElf.symbols.items, 0..) |*symbol, i| {
         const name = symbol.getDisplayName();
         try symbol_map.put(name, i);
-        try original_symbols.append(name);
+        try original_symbols.append(linker.allocator, name);
         if (symbol.get_bind() == .STB_GLOBAL and global_ptr == 0) {
             global_ptr = i;
         }
@@ -42,10 +42,10 @@ pub fn mergeSymbols(linker: *ElfLinker, file: *const elf.Elf64, section_map: std
                 linker.mutElf.symbols.items[index] = symbol.*;
             }
         } else if (symbol.get_bind() == .STB_GLOBAL) {
-            try linker.mutElf.symbols.append(symbol.*);
+            try linker.mutElf.symbols.append(linker.allocator, symbol.*);
             try symbol_map.put(symbol.getDisplayName(), linker.mutElf.symbols.items.len - 1);
         } else {
-            try linker.mutElf.symbols.insert(global_ptr, symbol.*);
+            try linker.mutElf.symbols.insert(linker.allocator, global_ptr, symbol.*);
             try symbol_map.put(symbol.getDisplayName(), global_ptr);
             global_ptr += 1;
         }
@@ -103,8 +103,8 @@ fn get_section_of_symbol(symbol: elf.Symbol, file: elf.Elf64, section_map: std.S
 }
 
 pub fn addSymbolSections(self: *ElfLinker) !void {
-    var names = std.ArrayList(u8).init(self.allocator);
-    defer names.deinit();
+    var names: std.ArrayList(u8) = .empty;
+    defer names.deinit(self.allocator);
 
     const symbols = self.mutElf.symbols.items;
     const symbols_index = self.mutElf.sections.items.len;
@@ -115,7 +115,7 @@ pub fn addSymbolSections(self: *ElfLinker) !void {
         self.mutElf.sections.items,
         symbols_index + 1,
     );
-    try self.mutElf.sections.append(section);
+    try self.mutElf.sections.append(self.allocator, section);
 
     const strtab = elf.Section{
         .name = ".strtab",
@@ -125,13 +125,13 @@ pub fn addSymbolSections(self: *ElfLinker) !void {
         .link = 0,
         .info = 0,
         .addralign = 1,
-        .data = try names.toOwnedSlice(),
+        .data = try names.toOwnedSlice(self.allocator),
         .entsize = 0,
         .relocations = null,
 
         .allocator = self.allocator,
     };
-    try self.mutElf.sections.append(strtab);
+    try self.mutElf.sections.append(self.allocator, strtab);
 }
 
 fn buildSymbolSection(
@@ -141,9 +141,9 @@ fn buildSymbolSection(
     sections: []const elf.Section,
     symbols_index: usize,
 ) !elf.Section {
-    var data = std.ArrayList(u8).init(allocator);
-    defer data.deinit();
-    try names.append(0);
+    var data: std.ArrayList(u8) = .empty;
+    defer data.deinit(allocator);
+    try names.append(allocator, 0);
 
     var section_map = std.StringHashMap(usize).init(allocator);
     defer section_map.deinit();
@@ -163,18 +163,18 @@ fn buildSymbolSection(
         if (sym.name.len != 0 and sym.get_type() != .STT_SECTION) {
             const offset: u32 = @intCast(names.items.len);
             std.mem.writeInt(u32, &name, offset, std.builtin.Endian.little);
-            try names.appendSlice(sym.name);
-            try names.append(0);
+            try names.appendSlice(allocator, sym.name);
+            try names.append(allocator, 0);
         } else {
             name = std.mem.zeroes([4]u8);
         }
 
-        try symbolToData(sym, name, section_map, &data);
+        try symbolToData(allocator, sym, name, section_map, &data);
     }
 
     return elf.Section{
         .name = ".symtab",
-        .data = try data.toOwnedSlice(),
+        .data = try data.toOwnedSlice(allocator),
         .type = .SHT_SYMTAB,
         .flags = 0,
         .addr = 0,
@@ -189,7 +189,7 @@ fn buildSymbolSection(
     };
 }
 
-pub fn symbolToData(symbol: elf.Symbol, name_idx: [4]u8, section_map: ?std.StringHashMap(usize), data: *std.ArrayList(u8)) !void {
+pub fn symbolToData(allocator: std.mem.Allocator, symbol: elf.Symbol, name_idx: [4]u8, section_map: ?std.StringHashMap(usize), data: *std.ArrayList(u8)) !void {
     var shndx: [2]u8 = undefined;
     if (section_map == null) {
         std.mem.writeInt(u16, &shndx, 0, std.builtin.Endian.little);
@@ -203,12 +203,12 @@ pub fn symbolToData(symbol: elf.Symbol, name_idx: [4]u8, section_map: ?std.Strin
     var size: [8]u8 = undefined;
     std.mem.writeInt(u64, &size, symbol.size, std.builtin.Endian.little);
 
-    try data.appendSlice(&name_idx);
-    try data.append(symbol.info);
-    try data.append(symbol.other);
-    try data.appendSlice(&shndx);
-    try data.appendSlice(&value);
-    try data.appendSlice(&size);
+    try data.appendSlice(allocator, &name_idx);
+    try data.append(allocator, symbol.info);
+    try data.append(allocator, symbol.other);
+    try data.appendSlice(allocator, &shndx);
+    try data.appendSlice(allocator, &value);
+    try data.appendSlice(allocator, &size);
 }
 
 pub fn updateMemValues(linker: *ElfLinker) !void {

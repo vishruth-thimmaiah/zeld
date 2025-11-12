@@ -22,7 +22,10 @@ fn build_object(allocator: std.mem.Allocator, file: []const u8, output: []const 
     if (command.stdin) |stdin| {
         defer stdin.close();
         defer command.stdin = null;
-        try stdin.writer().writeAll(file);
+        var buf: [1024]u8 = undefined;
+        var w = stdin.writer(&buf);
+        try w.interface.writeAll(file);
+        try w.interface.flush();
     }
 
     const result = try command.wait();
@@ -184,8 +187,9 @@ fn get_clib_exec(allocator: std.mem.Allocator, file: []const u8) ![]u8 {
     command.stdout_behavior = .Pipe;
 
     try command.spawn();
-    const path = (try command.stdout.?.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 100)).?;
-    defer allocator.free(path);
+    var buf: [1024]u8 = undefined;
+    var r = command.stdout.?.reader(&buf);
+    const path = (try r.interface.takeDelimiter('\n')).?;
 
     return std.fs.realpathAlloc(allocator, path);
 }

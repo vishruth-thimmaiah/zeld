@@ -9,25 +9,26 @@ const Segment = union(enum) {
     SEGMENT_END,
     SECTION: *elf.Section,
 
-    fn addSingleSegment(segments: *SegmentArray, section: *elf.Section, offset: u64, type_: elf.ProgramHeader.Type, flags: u32, align_: u64) !void {
-        try segments.append(.{ .SEGMENT_START = .{ type_, flags, align_, offset } });
-        try segments.append(.{ .SECTION = section });
-        try segments.append(.SEGMENT_END);
+    fn addSingleSegment(allocator: std.mem.Allocator, segments: *SegmentArray, section: *elf.Section, offset: u64, type_: elf.ProgramHeader.Type, flags: u32, align_: u64) !void {
+        try segments.append(allocator, .{ .SEGMENT_START = .{ type_, flags, align_, offset } });
+        try segments.append(allocator, .{ .SECTION = section });
+        try segments.append(allocator, .SEGMENT_END);
     }
 
-    fn prependSingleSegment(segments: *SegmentArray, section: *elf.Section, offset: u64, type_: elf.ProgramHeader.Type, flags: u32, align_: u64) !void {
-        try segments.insert(0, .{ .SEGMENT_START = .{ type_, flags, align_, offset } });
-        try segments.insert(1, .{ .SECTION = section });
-        try segments.insert(2, .SEGMENT_END);
+    fn prependSingleSegment(allocator: std.mem.Allocator, segments: *SegmentArray, section: *elf.Section, offset: u64, type_: elf.ProgramHeader.Type, flags: u32, align_: u64) !void {
+        try segments.insert(allocator, 0, .{ .SEGMENT_START = .{ type_, flags, align_, offset } });
+        try segments.insert(allocator, 1, .{ .SECTION = section });
+        try segments.insert(allocator, 2, .SEGMENT_END);
     }
 };
 
 fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
     const sections = linker.mutElf.sections.items;
 
-    var segments = SegmentArray.init(linker.allocator);
-    var other_segments = SegmentArray.init(linker.allocator);
-    defer other_segments.deinit();
+    var segments: SegmentArray = .empty;
+    var other_segments: SegmentArray = .empty;
+    defer other_segments.deinit(linker.allocator);
+    defer segments.deinit(linker.allocator);
 
     var counter: u32 = 0;
     var addr: u64 = elf.START_ADDR;
@@ -44,32 +45,32 @@ fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
         if (flags) |flag| {
             const last = segments.getLastOrNull() orelse last: {
                 counter += 1;
-                try segments.append(.{ .SEGMENT_START = .{ .PT_LOAD, flag, 0x1000, offset } });
+                try segments.append(linker.allocator, .{ .SEGMENT_START = .{ .PT_LOAD, flag, 0x1000, offset } });
                 break :last segments.getLast();
             };
             if (last == .SECTION and last.SECTION.flags != section.flags) {
                 counter += 1;
                 addr += 0x1000;
-                try segments.append(.SEGMENT_END);
-                try segments.append(.{ .SEGMENT_START = .{ .PT_LOAD, flag, 0x1000, offset } });
+                try segments.append(linker.allocator, .SEGMENT_END);
+                try segments.append(linker.allocator, .{ .SEGMENT_START = .{ .PT_LOAD, flag, 0x1000, offset } });
             } else if (last == .SEGMENT_END) {
                 counter += 1;
                 addr += 0x1000;
-                try segments.append(.{ .SEGMENT_START = .{ .PT_LOAD, flag, 0x1000, offset } });
+                try segments.append(linker.allocator, .{ .SEGMENT_START = .{ .PT_LOAD, flag, 0x1000, offset } });
             }
-            try segments.append(.{ .SECTION = section });
+            try segments.append(linker.allocator, .{ .SECTION = section });
         }
 
         if (std.mem.eql(u8, section.name, ".interp")) {
-            try Segment.prependSingleSegment(&segments, section, offset, .PT_INTERP, 0b100, 0x1);
+            try Segment.prependSingleSegment(linker.allocator, &segments, section, offset, .PT_INTERP, 0b100, 0x1);
             counter += 1;
         }
         if (section.type == .SHT_NOTE) {
-            try Segment.addSingleSegment(&other_segments, section, offset, .PT_NOTE, 0b100, 0x8);
+            try Segment.addSingleSegment(linker.allocator, &other_segments, section, offset, .PT_NOTE, 0b100, 0x8);
             counter += 1;
         }
         if (section.type == .SHT_DYNAMIC) {
-            try Segment.addSingleSegment(&other_segments, section, offset, .PT_DYNAMIC, 0b101, 0x8);
+            try Segment.addSingleSegment(linker.allocator, &other_segments, section, offset, .PT_DYNAMIC, 0b101, 0x8);
             counter += 1;
         }
 
@@ -77,9 +78,9 @@ fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
         addr += section.data.len;
         offset += section.data.len;
     }
-    try segments.append(.SEGMENT_END);
+    try segments.append(linker.allocator, .SEGMENT_END);
 
-    try segments.appendSlice(other_segments.items);
+    try segments.appendSlice(linker.allocator, other_segments.items);
 
     for (sections) |*section| {
         section.addr += 0x40 + (counter + 1) * @sizeOf(elf.ProgramHeader);
@@ -93,7 +94,7 @@ fn SegmentBuilder(linker: *ElfLinker) !struct { []Segment, u32 } {
     //     }
     // }
 
-    return .{ try segments.toOwnedSlice(), counter };
+    return .{ try segments.toOwnedSlice(linker.allocator), counter };
 }
 
 pub fn generatePheaders(linker: *ElfLinker) !void {
@@ -103,12 +104,12 @@ pub fn generatePheaders(linker: *ElfLinker) !void {
     const segment_count = sb.@"1" + 1; // +1 for the PHDR
     defer linker.allocator.free(segments);
 
-    linker.mutElf.pheaders = std.ArrayList(elf.ProgramHeader).init(linker.allocator);
+    linker.mutElf.pheaders = std.ArrayList(elf.ProgramHeader).empty;
     const pheaders = &linker.mutElf.pheaders.?;
     var load_count: usize = 0;
     var memsz: u64 = 0;
 
-    try pheaders.append(generatePHDR(segment_count));
+    try pheaders.append(linker.allocator, generatePHDR(segment_count));
 
     for (segments) |*segment| {
         switch (segment.*) {
@@ -118,7 +119,7 @@ pub fn generatePheaders(linker: *ElfLinker) !void {
                 if (is_first_load) {
                     memsz += 0x40 + 56 * segment_count;
                 }
-                try pheaders.append(elf.ProgramHeader{
+                try pheaders.append(linker.allocator, elf.ProgramHeader{
                     .type = start.@"0",
                     .flags = start.@"1",
                     .offset = if (is_first_load) 0 else start.@"3" + segment_count * @sizeOf(elf.ProgramHeader),

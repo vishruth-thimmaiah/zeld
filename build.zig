@@ -45,9 +45,11 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "zeld",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     exe.root_module.addImport("parser", parser);
     exe.root_module.addImport("linker", linker);
@@ -78,14 +80,16 @@ pub fn build(b: *std.Build) void {
 
     // This creates a build step. It will be visible in the `zig build --help` menu,
     // and can be selected like this: `zig build run`
-    // This will evaluate the `run` step rather than the default, which is "install".   
+    // This will evaluate the `run` step rather than the default, which is "install".
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = b.path("tests/tests.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tests/tests.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     exe_unit_tests.root_module.addImport("parser", parser);

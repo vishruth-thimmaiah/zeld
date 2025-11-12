@@ -9,8 +9,8 @@ pub fn addRelocationSections(self: *ElfLinker) !void {
     const sections = self.mutElf.sections.items;
     const len = sections.len - 1;
 
-    var rela_indexes = std.ArrayList(struct { Section, usize }).init(self.allocator);
-    defer rela_indexes.deinit();
+    var rela_indexes: std.ArrayList(struct { Section, usize }) = .empty;
+    defer rela_indexes.deinit(self.allocator);
 
     var rela_count: u32 = 0;
 
@@ -23,7 +23,7 @@ pub fn addRelocationSections(self: *ElfLinker) !void {
                 len + 1,
                 i + rela_count,
             );
-            try rela_indexes.append(.{ relocSection, i + rela_count + 1 });
+            try rela_indexes.append(self.allocator, .{ relocSection, i + rela_count + 1 });
             rela_count += 1;
         }
     }
@@ -32,7 +32,7 @@ pub fn addRelocationSections(self: *ElfLinker) !void {
         const idx = relainfo[1];
         var rela = relainfo[0];
         rela.link += rela_count + 1;
-        try self.mutElf.sections.insert(idx, rela);
+        try self.mutElf.sections.insert(self.allocator, idx, rela);
     }
 }
 
@@ -43,8 +43,8 @@ fn buildRelocationSection(
     sh_size: usize,
     sh_info: usize,
 ) !Section {
-    var data = try std.ArrayList(u8).initCapacity(allocator, relocations.len * 24);
-    defer data.deinit();
+    var data: std.ArrayList(u8) = .empty;
+    defer data.deinit(allocator);
 
     for (relocations) |reloc| {
         var offset: [8]u8 = undefined;
@@ -54,16 +54,16 @@ fn buildRelocationSection(
         var addend: [8]u8 = undefined;
         std.mem.writeInt(i64, &addend, reloc.addend, std.builtin.Endian.little);
 
-        try data.appendSlice(&offset);
-        try data.appendSlice(&info);
-        try data.appendSlice(&addend);
+        try data.appendSlice(allocator, &offset);
+        try data.appendSlice(allocator, &info);
+        try data.appendSlice(allocator, &addend);
     }
 
     const rela_name = try std.fmt.allocPrint(allocator, ".rela{s}", .{name});
 
     return Section{
         .name = rela_name,
-        .data = try data.toOwnedSlice(),
+        .data = try data.toOwnedSlice(allocator),
         .type = .SHT_RELA,
         .flags = 0,
         .addr = 0,

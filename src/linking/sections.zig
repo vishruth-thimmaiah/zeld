@@ -17,7 +17,7 @@ pub fn mergeSections(linker: *ElfLinker, file: *const elf.Elf64) !std.StringHash
             original_section.data = try mergeData(linker, original_section.data, section.data, alignment);
             original_section.relocations = try mergeRelas(linker, original_section.relocations, section.relocations, alignment);
         } else {
-            try sections.append(section.*);
+            try sections.append(linker.allocator, section.*);
             // FIXME: temporary solution for double free when appending a section
             const last = &sections.items[sections.items.len - 1];
             last.data = try linker.allocator.dupe(u8, section.data);

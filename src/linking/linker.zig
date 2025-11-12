@@ -113,7 +113,7 @@ pub const ElfLinker = struct {
 
             .allocator = self.allocator,
         };
-        try sections.insert(0, interp);
+        try sections.insert(self.allocator, 0, interp);
     }
 
     pub fn deinit(self: *const ElfLinker) void {

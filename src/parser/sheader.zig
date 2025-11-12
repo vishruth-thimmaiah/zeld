@@ -6,8 +6,8 @@ pub fn parse(allocator: std.mem.Allocator, bytes: []const u8, fheader: elf.Heade
     var offset: usize = fheader.shoff;
     const endian = fheader.data;
 
-    var headers = std.ArrayList(elf.SectionHeader).init(allocator);
-    defer headers.deinit();
+    var headers: std.ArrayList(elf.SectionHeader) = .empty;
+    defer headers.deinit(allocator);
 
     for (0..fheader.shnum) |_| {
         var link = utils.readInt(u32, bytes, offset + 40, endian);
@@ -31,9 +31,9 @@ pub fn parse(allocator: std.mem.Allocator, bytes: []const u8, fheader: elf.Heade
             .entsize = utils.readInt(u64, bytes, offset + 56, endian),
         };
         if (header.type != .SHT_NULL) {
-            try headers.append(header);
+            try headers.append(allocator, header);
         }
         offset += fheader.shentsize;
     }
-    return headers.toOwnedSlice();
+    return try headers.toOwnedSlice(allocator);
 }

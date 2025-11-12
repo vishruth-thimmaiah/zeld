@@ -12,7 +12,7 @@ pub const dynlibs = @import("dynlibs.zig");
 
 pub fn new(allocator: std.mem.Allocator, path: *[]const u8) !elf.Elf64 {
     const file = std.fs.cwd().openFile(path.*, .{}) catch |err| {
-        std.debug.print("Error {s}: Failed to open '{s}'\n", .{ @errorName(err), path });
+        std.debug.print("Error {s}: Failed to open '{s}'\n", .{ @errorName(err), path.* });
         std.process.exit(1);
     };
     defer file.close();
@@ -28,21 +28,21 @@ pub fn new(allocator: std.mem.Allocator, path: *[]const u8) !elf.Elf64 {
 
     defer all_sections[fileHeader.shstrndx].deinit();
 
-    var sections = std.ArrayList(elf.Section).init(allocator);
-    defer sections.deinit();
+    var sections: std.ArrayList(elf.Section) = .empty;
+    defer sections.deinit(allocator);
 
     var special_section_count: usize = 0;
-    var symtab_index: usize = undefined;
-    var rela_indexes = std.ArrayList([2]usize).init(allocator);
-    defer rela_indexes.deinit();
+    var symtab_index: usize = 0;
+    var rela_indexes: std.ArrayList([2]usize) = .empty;
+    defer rela_indexes.deinit(allocator);
 
     for (sheaders, 0..) |sheader, i| {
         try switch (sheader.type) {
             .SHT_SYMTAB => symtab_index = i,
             .SHT_STRTAB => {},
-            .SHT_RELA => rela_indexes.append([2]usize{ i, special_section_count }),
+            .SHT_RELA => rela_indexes.append(allocator, [2]usize{ i, special_section_count }),
             else => {
-                try sections.append(all_sections[i]);
+                try sections.append(allocator, all_sections[i]);
                 continue;
             },
         };
@@ -76,7 +76,7 @@ pub fn new(allocator: std.mem.Allocator, path: *[]const u8) !elf.Elf64 {
         .pheaders = null,
         .sheaders = sheaders,
         .symbols = symbols,
-        .sections = try sections.toOwnedSlice(),
+        .sections = try sections.toOwnedSlice(allocator),
 
         .allocator = allocator,
     };

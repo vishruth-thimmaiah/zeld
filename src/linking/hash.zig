@@ -28,26 +28,26 @@ pub fn buildHashTable(self: *linker.ElfLinker, dynsym: []elf.Symbol) !elf.Dynami
         buckets[bucket_idx] = @intCast(i + 1);
     }
 
-    var hash_data = std.ArrayList(u8).init(self.allocator);
-    defer hash_data.deinit();
+    var hash_data: std.ArrayList(u8) = .empty;
+    defer hash_data.deinit(self.allocator);
 
-    try hash_data.appendSlice(std.mem.asBytes(&nbucket));
-    try hash_data.appendSlice(std.mem.asBytes(&nchain));
+    try hash_data.appendSlice(self.allocator, std.mem.asBytes(&nbucket));
+    try hash_data.appendSlice(self.allocator, std.mem.asBytes(&nchain));
 
     for (buckets) |bucket| {
-        try hash_data.appendSlice(std.mem.asBytes(&bucket));
+        try hash_data.appendSlice(self.allocator, std.mem.asBytes(&bucket));
     }
 
     for (chains) |chain| {
-        try hash_data.appendSlice(std.mem.asBytes(&chain));
+        try hash_data.appendSlice(self.allocator, std.mem.asBytes(&chain));
     }
 
-    try self.mutElf.sections.append(.{
+    try self.mutElf.sections.append(self.allocator, .{
         .name = ".hash",
         .type = .SHT_HASH,
         .flags = 0b010,
         .addr = 0,
-        .data = try hash_data.toOwnedSlice(),
+        .data = try hash_data.toOwnedSlice(self.allocator),
         .link = 0,
         .info = 0,
         .addralign = 0x4,

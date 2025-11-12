@@ -13,7 +13,9 @@ pub fn parse(
     symtab_index: usize,
 ) ![]elf.Symbol {
     var symbols = try std.ArrayList(elf.Symbol).initCapacity(allocator, sheaders.len);
-    defer symbols.deinit();
+    defer symbols.deinit(allocator);
+
+    if (symtab_index == 0) return symbols.toOwnedSlice(allocator);
 
     const symtab_header = sheaders[symtab_index];
 
@@ -32,10 +34,10 @@ pub fn parse(
             .allocator = allocator,
         };
 
-        try symbols.append(symbol);
+        try symbols.append(allocator, symbol);
     }
 
-    return symbols.toOwnedSlice();
+    return try symbols.toOwnedSlice(allocator);
 }
 
 fn getSymbolName(idx: u32, bytes: []const u8) []const u8 {

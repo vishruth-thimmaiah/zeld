@@ -9,25 +9,30 @@ pub fn writer(elf_: *elf.Elf64, filename: []const u8) !void {
     var file = try std.fs.cwd().createFile(filename, .{ .mode = 0o777 });
     defer file.close();
 
-    const fileWriter = file.writer();
+    var buf: [4096]u8 = undefined;
+    var fsWriter = file.writer(&buf);
+    const interface = &fsWriter.interface;
 
     const aligned_shrd = elf.helpers.getAlignment(elf_.header.shoff, 16) - elf_.header.shoff;
     elf_.header.shoff += aligned_shrd;
 
-    try writeHeader(fileWriter, elf_.header);
+    try writeHeader(interface, elf_.header);
 
     if (elf_.pheaders) |ph| {
-        try writePHeader(fileWriter, ph);
+        try writePHeader(interface, ph);
     }
 
-    try writeSections(fileWriter, elf_.sections);
+    try writeSections(interface, elf_.sections);
     if (aligned_shrd != 0) {
-        try writeZeroBytes(fileWriter, aligned_shrd);
+        try writeZeroBytes(interface, aligned_shrd);
     }
 
-    try writeSHeader(fileWriter, elf_.sheaders);
+    try writeSHeader(interface, elf_.sheaders);
+
+    // Flush the buffer to ensure all data is written to the file
+    try interface.flush();
 }
 
-pub fn writeZeroBytes(write: std.fs.File.Writer, n: usize) !void {
-    try write.writeByteNTimes(0, n);
+pub fn writeZeroBytes(write: *std.io.Writer, n: usize) !void {
+    _ = try write.splatByte(0, n);
 }

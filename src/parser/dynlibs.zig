@@ -16,7 +16,7 @@ pub const Dynlib = struct {
 
     pub fn new(allocator: std.mem.Allocator, path: *[]const u8) !Dynlib {
         const file = std.fs.cwd().openFile(path.*, .{}) catch |err| {
-            std.debug.print("Error {s}: Failed to open '{s}'\n", .{ @errorName(err), path });
+            std.debug.print("Error {s}: Failed to open '{s}'\n", .{ @errorName(err), path.* });
             std.process.exit(1);
         };
         defer file.close();

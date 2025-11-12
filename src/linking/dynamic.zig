@@ -15,8 +15,8 @@ fn getDynstr(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct { []el
             .tag = .DT_NEEDED,
             .un = .{ .val = dynstr.items.len },
         };
-        try dynstr.appendSlice(lib);
-        try dynstr.append(0);
+        try dynstr.appendSlice(self.allocator, lib);
+        try dynstr.append(self.allocator, 0);
     }
     needed[needed.len - 2] = .{
         .tag = .DT_STRTAB,
@@ -28,12 +28,12 @@ fn getDynstr(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct { []el
         .un = .{ .val = dynstr.items.len },
     };
 
-    try self.mutElf.sections.append(.{
+    try self.mutElf.sections.append(self.allocator, .{
         .name = ".dynstr",
         .type = .SHT_STRTAB,
         .flags = 0b010,
         .addr = 0,
-        .data = try dynstr.toOwnedSlice(),
+        .data = try dynstr.toOwnedSlice(self.allocator),
         .link = 0,
         .info = 0,
         .addralign = 0x1,
@@ -50,28 +50,28 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation, dynstr: *std.Array
     var dynsym = try self.allocator.alloc(elf.Symbol, rela.len);
     defer self.allocator.free(dynsym);
 
-    var dynsym_string = try std.ArrayList(u8).initCapacity(self.allocator, 0x18 * (rela.len + 1));
-    defer dynsym_string.deinit();
-    try dynsym_string.appendNTimes(0, 0x18);
+    var dynsym_string: std.ArrayList(u8) = .empty;
+    defer dynsym_string.deinit(self.allocator);
+    try dynsym_string.appendNTimes(self.allocator, 0, 0x18);
 
     for (rela, 0..) |*reloc, i| {
         const symbol = self.mutElf.symbols.items[reloc.get_symbol()];
         dynsym[i] = symbol;
         reloc.set_symbol(i + 1);
         reloc.addend = 0;
-        try symbols.symbolToData(symbol, std.mem.toBytes(@as(u32, @intCast(dynstr.items.len))), null, &dynsym_string);
-        try dynstr.appendSlice(symbol.name);
-        try dynstr.append(0);
+        try symbols.symbolToData(self.allocator, symbol, std.mem.toBytes(@as(u32, @intCast(dynstr.items.len))), null, &dynsym_string);
+        try dynstr.appendSlice(self.allocator, symbol.name);
+        try dynstr.append(self.allocator, 0);
     }
 
     const hash_info = try hash.buildHashTable(self, dynsym);
 
-    try self.mutElf.sections.append(.{
+    try self.mutElf.sections.append(self.allocator, .{
         .name = ".dynsym",
         .type = .SHT_DYNSYM,
         .flags = 0b010,
         .addr = 0,
-        .data = try dynsym_string.toOwnedSlice(),
+        .data = try dynsym_string.toOwnedSlice(self.allocator),
         .link = 0,
         .info = @intCast(dynsym.len + 1),
         .addralign = 0x1,
@@ -92,8 +92,8 @@ fn getDynsym(self: *linker.ElfLinker, rela: []elf.Relocation, dynstr: *std.Array
 }
 
 fn buildRelaTable(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct { [3]elf.Dynamic, []elf.Relocation, usize } {
-    var dynrela = std.ArrayList(elf.Relocation).init(self.allocator);
-    defer dynrela.deinit();
+    var dynrela: std.ArrayList(elf.Relocation) = .empty;
+    defer dynrela.deinit(self.allocator);
 
     var dynrela_map = std.StringHashMap(*elf.Symbol).init(self.allocator);
     defer dynrela_map.deinit();
@@ -124,7 +124,7 @@ fn buildRelaTable(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct {
                 var new_reloc = reloc.*;
                 try dynrela_map.put(symbol.name, symbol);
                 new_reloc.set_type(reloc_cat);
-                try dynrela.append(new_reloc);
+                try dynrela.append(self.allocator, new_reloc);
             }
         }
     }
@@ -132,7 +132,7 @@ fn buildRelaTable(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct {
 
     const reloc_data: []u8 = try self.allocator.alloc(u8, 0x18 * dynrela.items.len);
 
-    try self.mutElf.sections.append(.{
+    try self.mutElf.sections.append(self.allocator, .{
         .name = ".rela.dyn",
         .type = .SHT_RELA,
         .flags = 0b010,
@@ -158,7 +158,7 @@ fn buildRelaTable(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct {
             .tag = .DT_RELAENT,
             .un = .{ .val = 0x18 },
         } },
-        try dynrela.toOwnedSlice(),
+        try dynrela.toOwnedSlice(self.allocator),
         plt_count,
     };
 }
@@ -166,25 +166,25 @@ fn buildRelaTable(self: *linker.ElfLinker, dynstr: *std.ArrayList(u8)) !struct {
 pub fn createDynamicSection(self: *linker.ElfLinker) !?struct { []elf.Dynamic, []elf.Relocation } {
     if (self.args.dynamic_linker == null) return null;
 
-    var entries = std.ArrayList(elf.Dynamic).init(self.allocator);
-    defer entries.deinit();
-    var dynstr = std.ArrayList(u8).init(self.allocator);
-    defer dynstr.deinit();
-    try dynstr.append(0);
+    var entries: std.ArrayList(elf.Dynamic) = .empty;
+    defer entries.deinit(self.allocator);
+    var dynstr: std.ArrayList(u8) = .empty;
+    defer dynstr.deinit(self.allocator);
+    try dynstr.append(self.allocator, 0);
 
     const rela_info = try buildRelaTable(self, &dynstr);
-    try entries.appendSlice(&rela_info[0]);
+    try entries.appendSlice(self.allocator, &rela_info[0]);
     const dynsym_info = try getDynsym(self, rela_info[1], &dynstr);
-    try entries.appendSlice(&dynsym_info);
+    try entries.appendSlice(self.allocator, &dynsym_info);
     const plt_info = try got.addPltSection(self, rela_info[2]);
-    try entries.append(plt_info);
+    try entries.append(self.allocator, plt_info);
     try got.addGotSection(self, rela_info[1]);
 
     const needed = try getDynstr(self, &dynstr);
     defer self.allocator.free(needed[0]);
-    try entries.appendSlice(needed[0]);
+    try entries.appendSlice(self.allocator, needed[0]);
 
-    try entries.append(.{
+    try entries.append(self.allocator, .{
         .tag = .DT_NULL,
         .un = .{ .ptr = 0 },
     });
@@ -204,10 +204,10 @@ pub fn createDynamicSection(self: *linker.ElfLinker) !?struct { []elf.Dynamic, [
         .allocator = self.allocator,
     };
 
-    try self.mutElf.sections.append(dynamic);
+    try self.mutElf.sections.append(self.allocator, dynamic);
 
     return .{
-        try entries.toOwnedSlice(),
+        try entries.toOwnedSlice(self.allocator),
         rela_info[1],
     };
 }
@@ -251,8 +251,8 @@ pub fn updateDynamicSection(self: *linker.ElfLinker, dyn: ?struct { []elf.Dynami
         }
     }
 
-    var dynstr_data = std.ArrayList(u8).init(self.allocator);
-    defer dynstr_data.deinit();
+    var dynstr_data: std.ArrayList(u8) = .empty;
+    defer dynstr_data.deinit(self.allocator);
 
     for (dyn_relocs, 0..) |*r, i| {
         r.offset = got_s.addr + 0x8 * i;

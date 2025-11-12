@@ -6,7 +6,7 @@ pub fn addGotSection(self: *linker.ElfLinker, rela: []elf.Relocation) !void {
     const got = try self.allocator.alloc(u8, 0x8 * rela.len);
     @memset(got, 0);
 
-    try self.mutElf.sections.append(.{
+    try self.mutElf.sections.append(self.allocator, .{
         .name = ".got",
         .type = .SHT_PROGBITS,
         .flags = 0b011,
@@ -25,7 +25,7 @@ pub fn addGotSection(self: *linker.ElfLinker, rela: []elf.Relocation) !void {
 pub fn addPltSection(self: *linker.ElfLinker, plt_count: usize) !elf.Dynamic {
     const plt = try self.allocator.alloc(u8, 0x10 * plt_count);
 
-    try self.mutElf.sections.append(.{
+    try self.mutElf.sections.append(self.allocator, .{
         .name = ".plt",
         .type = .SHT_PROGBITS,
         .flags = 0b110,

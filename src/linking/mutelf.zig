@@ -18,14 +18,14 @@ pub const MutElf64 = struct {
         var pheaders: ?std.ArrayList(elf.ProgramHeader) = null;
         if (file.pheaders) |ph| {
             pheaders = try std.ArrayList(elf.ProgramHeader).initCapacity(allocator, ph.len);
-            try pheaders.?.appendSlice(ph);
+            try pheaders.?.appendSlice(allocator, ph);
         }
 
-        var mutSymbols = std.ArrayList(Symbol).init(allocator);
-        try mutSymbols.appendSlice(file.symbols);
-        var mutSections = std.ArrayList(Section).init(allocator);
+        var mutSymbols: std.ArrayList(Symbol) = .empty;
+        try mutSymbols.appendSlice(allocator, file.symbols);
+        var mutSections: std.ArrayList(Section) = .empty;
         for (file.sections, 0..) |symbol, idx| {
-            try mutSections.append(symbol);
+            try mutSections.append(allocator, symbol);
             mutSections.items[idx].data = try allocator.dupe(u8, symbol.data);
             if (symbol.relocations) |relocations| {
                 mutSections.items[idx].relocations = try allocator.dupe(elf.Relocation, relocations);
@@ -42,20 +42,20 @@ pub const MutElf64 = struct {
         };
     }
 
-    pub fn toElf64(self: *MutElf64, sheaders: []elf.SectionHeader ) !elf.Elf64 {
+    pub fn toElf64(self: *MutElf64, sheaders: []elf.SectionHeader) !elf.Elf64 {
         return elf.Elf64{
             .header = self.header,
-            .pheaders = if (self.pheaders) |*pheaders| try pheaders.toOwnedSlice() else null,
+            .pheaders = if (self.pheaders) |*pheaders| try pheaders.toOwnedSlice(self.allocator) else null,
             .sheaders = sheaders,
-            .symbols = try self.symbols.toOwnedSlice(),
-            .sections = try self.sections.toOwnedSlice(),
+            .symbols = try self.symbols.toOwnedSlice(self.allocator),
+            .sections = try self.sections.toOwnedSlice(self.allocator),
 
             .allocator = self.allocator,
         };
     }
 
-    pub fn deinit(self: *const MutElf64) void {
-        self.symbols.deinit();
-        self.sections.deinit();
+    pub fn deinit(self: *MutElf64) void {
+        self.symbols.deinit(self.allocator);
+        self.sections.deinit(self.allocator);
     }
 };
