@@ -35,6 +35,9 @@ pub const Args = struct {
         _ = args.skip();
 
         while (args.next()) |next| {
+            if (streql(next, "-h", "--help")) {
+                return error.Help;
+            }
             if (streql(next, "-o", "--output")) {
                 if (args.next()) |output| {
                     results.output = output;
