@@ -5,6 +5,14 @@ A small linker built with zig, that can link Elf64 files.
 
 ## Build
 
+## Requirements
+
+- [zig](https://ziglang.org/)
+
+Zig can be installed using a [package manager](https://ziglang.org/learn/getting-started/#install-zig-using-a-package-manager).
+
+## Build
+
 ```sh
 zig build
 ```
@@ -12,7 +20,13 @@ zig build
 ## Usage
 
 ```sh
-./zig-out/bin/zeld --help
+# from the root directory,
+./zig-out/bin/zeld <input files>
+```
+or
+
+```sh
+zig build run -- <input files>
 ```
 
 ## Flags
